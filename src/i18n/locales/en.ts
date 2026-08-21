@@ -1192,6 +1192,10 @@ export default {
     'Creating room...': 'Creating room...',
     'Room created!': 'Room created!',
     'Connecting...': 'Connecting...',
-    'Nostr Profile': 'Nostr Profile'
+    'Nostr Profile': 'Nostr Profile',
+    'Delete room': 'Delete room',
+    'Are you sure you want to delete "{{room}}"? This will remove the LiveKit room, access policies, and Nostr announcement. This action cannot be undone.': 'Are you sure you want to delete "{{room}}"? This will remove the LiveKit room, access policies, and Nostr announcement. This action cannot be undone.',
+    'Room "{{room}}" deleted': 'Room "{{room}}" deleted',
+    'Failed to delete room': 'Failed to delete room'
   }
 }

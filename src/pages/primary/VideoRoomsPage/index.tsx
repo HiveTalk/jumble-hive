@@ -1,4 +1,14 @@
 import { Button } from '@/components/ui/button'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from '@/components/ui/alert-dialog'
 import PrimaryPageLayout from '@/layouts/PrimaryPageLayout'
 import { setPendingVideoRoom } from '@/lib/hiverelay-room-state'
 import { toVideoRoom } from '@/lib/link'
@@ -11,7 +21,7 @@ import {
   THiveRelayRoomSummary,
   THiveRelaySubscription
 } from '@/types/hiverelay'
-import { Circle, Loader2, Plus, RefreshCw, Users, Video, Zap } from 'lucide-react'
+import { CheckCircle2, Circle, Loader2, Plus, RefreshCw, Trash2, Users, Video, Zap } from 'lucide-react'
 import { forwardRef, useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -30,6 +40,8 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
   const [loading, setLoading] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [subscribeOpen, setSubscribeOpen] = useState(false)
+  const [deletingRoom, setDeletingRoom] = useState<THiveRelayOwnedRoom | null>(null)
+  const [deleteLoading, setDeleteLoading] = useState(false)
 
   const refresh = useCallback(async () => {
     if (!pubkey) return
@@ -92,6 +104,25 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
 
   const entitled = subscription?.entitled ?? false
 
+  const confirmDelete = async () => {
+    if (!deletingRoom) return
+    setDeleteLoading(true)
+    try {
+      const result = await hiverelayService.deleteRoom(deletingRoom.room_name)
+      if (result.deleted) {
+        toast.success(t('Room "{{room}}" deleted', { room: deletingRoom.room_name }))
+        setOwnedRooms((prev) => prev.filter((r) => r.room_id !== deletingRoom.room_id))
+      } else {
+        toast.error(t('Failed to delete room'))
+      }
+    } catch (e) {
+      toast.error(e instanceof Error && e.message ? e.message : t('Failed to delete room'))
+    } finally {
+      setDeleteLoading(false)
+      setDeletingRoom(null)
+    }
+  }
+
   return (
     <PrimaryPageLayout
       pageName="videoRooms"
@@ -124,13 +155,29 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
         ) : (
           <>
             {/* Subscription status */}
-            <div className="flex items-center justify-between rounded-xl border bg-background p-4">
+            <div
+              className={
+                entitled
+                  ? 'flex items-center justify-between rounded-xl border border-emerald-500/50 bg-gradient-to-r from-emerald-500/20 to-green-500/10 p-4 ring-1 ring-emerald-500/30'
+                  : 'flex items-center justify-between rounded-xl border bg-background p-4'
+              }
+            >
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-2 font-semibold">
-                  <Zap className="size-4" />
+                <div
+                  className={
+                    entitled
+                      ? 'flex items-center gap-2 font-semibold text-emerald-600 dark:text-emerald-400'
+                      : 'flex items-center gap-2 font-semibold'
+                  }
+                >
+                  {entitled ? (
+                    <CheckCircle2 className="size-5 text-emerald-500" />
+                  ) : (
+                    <Zap className="size-4" />
+                  )}
                   {entitled ? t('Subscription active') : t('No active subscription')}
                 </div>
-                <div className="text-xs text-muted-foreground">
+                <div className={entitled ? 'text-xs text-emerald-600/70 dark:text-emerald-400/70' : 'text-xs text-muted-foreground'}>
                   {subscription?.plan
                     ? t('Plan: {{plan}}', { plan: subscription.plan.replace(/_/g, ' ') })
                     : t('Subscribe to create and own rooms.')}
@@ -177,25 +224,38 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
               ) : (
                 <div className="flex flex-col gap-2">
                   {ownedRooms.map((room) => (
-                    <button
+                    <div
                       key={room.room_id}
-                      onClick={() => joinOwned(room)}
-                      className="flex items-center justify-between rounded-xl border bg-background p-3 text-start transition-colors hover:bg-accent/40"
+                      className="flex items-center justify-between rounded-xl border bg-background p-3 transition-colors hover:bg-accent/40"
                     >
-                      <div className="min-w-0">
-                        <div className="truncate font-medium" dir="auto">
-                          {room.room_name}
+                      <button
+                        onClick={() => joinOwned(room)}
+                        className="flex min-w-0 flex-1 items-center justify-between text-start"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate font-medium" dir="auto">
+                            {room.room_name}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {room.is_private ? t('Private') : t('Public')}
+                            {room.audience_mode ? ` · ${t('Audience mode')}` : ''}
+                          </div>
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {room.is_private ? t('Private') : t('Public')}
-                          {room.audience_mode ? ` · ${t('Audience mode')}` : ''}
+                        <div className="flex items-center gap-1 text-primary">
+                          <Video className="size-4" />
+                          {t('Join')}
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1 text-primary">
-                        <Video className="size-4" />
-                        {t('Join')}
-                      </div>
-                    </button>
+                      </button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="ml-2 shrink-0 text-muted-foreground hover:text-destructive"
+                        onClick={() => setDeletingRoom(room)}
+                        title={t('Delete room')}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -245,6 +305,31 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
         onOpenChange={setSubscribeOpen}
         onSubscribed={() => refresh()}
       />
+
+      {/* Delete room confirmation */}
+      <AlertDialog open={!!deletingRoom} onOpenChange={(open) => !open && setDeletingRoom(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('Delete room')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t(
+                'Are you sure you want to delete "{{room}}"? This will remove the LiveKit room, access policies, and Nostr announcement. This action cannot be undone.',
+                { room: deletingRoom?.room_name }
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteLoading}>{t('Cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteLoading ? <Loader2 className="size-4 animate-spin" /> : t('Delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PrimaryPageLayout>
   )
 })

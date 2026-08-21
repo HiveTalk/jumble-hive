@@ -94,6 +94,13 @@ export interface THiveRelayRoomSummary {
   numParticipants: number
 }
 
+export interface THiveRelayRoomDeleteResponse {
+  deleted: boolean
+  room_name: string
+  livekit_deleted: boolean
+  events_removed: number
+}
+
 // ---- get-token --------------------------------------------------------
 
 export interface THiveRelayGetTokenRequest {

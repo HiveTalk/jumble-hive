@@ -14,6 +14,7 @@ import {
   THiveRelayPlanId,
   THiveRelayPlansResponse,
   THiveRelayRegisteredRoom,
+  THiveRelayRoomDeleteResponse,
   THiveRelayRoomInfo,
   THiveRelayRoomSummary,
   THiveRelaySubscription
@@ -28,6 +29,7 @@ type TAction =
   | 'subscribe'
   | 'create-room'
   | 'edit-room'
+  | 'delete-room'
   | 'payment-status'
   | 'subscription'
 
@@ -352,6 +354,29 @@ class HiveRelayService {
           signed_event: signedEvent
         }
       }
+    })
+  }
+
+  /**
+   * POST /api/room/delete {room_name, confirm} — owner-only cascade delete.
+   * Uses the LiveKit owner JWT as Bearer auth (not the action-event mechanism).
+   * `confirm` must echo `room_name` as a safety check. The LiveKit room, access
+   * policies, stage membership, polls and the Nostr announcement are all deleted.
+   * Recordings are preserved.
+   */
+  async deleteRoom(roomName: string): Promise<THiveRelayRoomDeleteResponse> {
+    // Get a LiveKit token for the room — for the owner, this token has the
+    // owner claim set to true, which is what the delete endpoint authenticates.
+    const participantName = (await this.getPublicKey()).slice(0, 8)
+    const { token } = await this.getToken({
+      roomName,
+      participantName,
+      pubkey: await this.getPublicKey()
+    })
+
+    return this.request<THiveRelayRoomDeleteResponse>('POST', '/api/room/delete', {
+      body: { room_name: roomName, confirm: roomName },
+      auth: `Bearer ${token}`
     })
   }
 

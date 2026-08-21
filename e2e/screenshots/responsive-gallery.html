@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HiveRelay Video Conference — Responsive Screenshots</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #0f0f1a;
+    color: #e0e0e0;
+    padding: 24px;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+  h1 {
+    color: #e94560;
+    font-size: 28px;
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    color: #888;
+    font-size: 14px;
+    margin-bottom: 32px;
+  }
+  .section {
+    margin-bottom: 40px;
+  }
+  .section-title {
+    font-size: 20px;
+    color: #4ade80;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 8px;
+  }
+  .viewport-label {
+    display: inline-block;
+    background: #1e293b;
+    color: #93c5fd;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin-bottom: 8px;
+  }
+  .screenshot-card {
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+  .screenshot-card img {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid #444;
+    display: block;
+  }
+  .screenshot-card .caption {
+    font-size: 13px;
+    color: #aaa;
+    margin-top: 10px;
+  }
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+  }
+  .controlbar-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+  .controlbar-card {
+    background: #1a1a2e;
+    border: 1px solid #333;
+    border-radius: 12px;
+    padding: 12px;
+  }
+  .controlbar-card img {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid #444;
+  }
+  .controlbar-card .label {
+    font-size: 12px;
+    color: #93c5fd;
+    text-align: center;
+    margin-bottom: 8px;
+    font-weight: 600;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .badge-desktop { background: #1e40af; color: #bfdbfe; }
+  .badge-tablet { background: #6b21a8; color: #e9d5ff; }
+  .badge-mobile { background: #166534; color: #bbf7d0; }
+  .pass {
+    color: #4ade80;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<h1>HiveRelay Video Conference — Responsive Screenshots</h1>
+<p class="subtitle">
+  Compact icon-only control bar tested at desktop (1280×800), tablet (768×1024), and mobile (390×844) sizes.
+  <span class="pass">✓ All tests passed</span>
+</p>
+
+<!-- Desktop -->
+<div class="section">
+  <div class="section-title">Desktop — 1280×800</div>
+
+  <div class="screenshot-card">
+    <span class="viewport-label">DESKTOP 1280×800</span>
+    <img src="responsive-01-desktop-prejoin.png" alt="Desktop PreJoin">
+    <div class="caption">PreJoin screen — device selection before entering the conference. Nostr profile username pre-filled.</div>
+  </div>
+
+  <div class="screenshot-card">
+    <span class="viewport-label">DESKTOP 1280×800</span>
+    <img src="responsive-02-desktop-conference.png" alt="Desktop Conference">
+    <div class="caption">Conference view — single participant (HiveHost) with camera ON. Compact icon-only control bar at bottom.</div>
+  </div>
+
+  <div class="screenshot-card">
+    <span class="viewport-label">DESKTOP — Control bar crop</span>
+    <img src="responsive-03-desktop-controlbar.png" alt="Desktop Control Bar">
+    <div class="caption">Control bar close-up — icon-only buttons (mic, camera, screen share, chat, leave). No text labels.</div>
+  </div>
+</div>
+
+<!-- Tablet -->
+<div class="section">
+  <div class="section-title">Tablet — 768×1024</div>
+
+  <div class="screenshot-card">
+    <span class="viewport-label">TABLET 768×1024</span>
+    <img src="responsive-04-tablet-conference.png" alt="Tablet Conference">
+    <div class="caption">Conference view on tablet — tiles and control bar adapt to narrower width.</div>
+  </div>
+
+  <div class="screenshot-card">
+    <span class="viewport-label">TABLET — Control bar crop</span>
+    <img src="responsive-05-tablet-controlbar.png" alt="Tablet Control Bar">
+    <div class="caption">Control bar on tablet — still compact, icon-only.</div>
+  </div>
+</div>
+
+<!-- Mobile -->
+<div class="section">
+  <div class="section-title">Mobile — 390×844 (iPhone 14 Pro)</div>
+
+  <div class="screenshot-card">
+    <span class="viewport-label">MOBILE 390×844</span>
+    <img src="responsive-06-mobile-conference.png" alt="Mobile Conference">
+    <div class="caption">Conference view on mobile — tile fills the screen, control bar fits comfortably at bottom.</div>
+  </div>
+
+  <div class="screenshot-card">
+    <span class="viewport-label">MOBILE — Control bar crop</span>
+    <img src="responsive-07-mobile-controlbar.png" alt="Mobile Control Bar">
+    <div class="caption">Control bar on mobile — all 5 icon buttons fit in 390px width without overflow.</div>
+  </div>
+</div>
+
+<!-- Control bar comparison -->
+<div class="section">
+  <div class="section-title">Control Bar — Side by Side Comparison</div>
+  <div class="controlbar-row">
+    <div class="controlbar-card">
+      <div class="label">Desktop (1280px)</div>
+      <img src="responsive-03-desktop-controlbar.png" alt="Desktop control bar">
+    </div>
+    <div class="controlbar-card">
+      <div class="label">Tablet (768px)</div>
+      <img src="responsive-05-tablet-controlbar.png" alt="Tablet control bar">
+    </div>
+    <div class="controlbar-card">
+      <div class="label">Mobile (390px)</div>
+      <img src="responsive-07-mobile-controlbar.png" alt="Mobile control bar">
+    </div>
+  </div>
+  <p style="color:#888; font-size:13px; margin-top:12px;">
+    The control bar uses <code style="background:#1e293b; padding:2px 6px; border-radius:4px;">variation="minimal"</code>
+    (icon-only, no "Microphone"/"Camera" text labels) and
+    <code style="background:#1e293b; padding:2px 6px; border-radius:4px;">--lk-control-bar-height: 52px</code>
+    (down from default 69px) for a compact, mobile-friendly layout.
+  </p>
+</div>
+
+<!-- Camera-off test -->
+<div class="section">
+  <div class="section-title">Camera Off — Avatar Placeholders</div>
+  <div class="grid-2">
+    <div class="screenshot-card">
+      <span class="viewport-label">User 1 view (HiveHost)</span>
+      <img src="camoff-02-user1-conference.png" alt="User 1 camera off">
+      <div class="caption">Both participants with camera off. Local tile shows HiveHost DiceBear avatar. Remote tile shows "B" fallback letter.</div>
+    </div>
+    <div class="screenshot-card">
+      <span class="viewport-label">User 2 view (BuzzGuest)</span>
+      <img src="camoff-02-user2-conference.png" alt="User 2 camera off">
+      <div class="caption">Both participants with camera off. Local tile shows BuzzGuest DiceBear avatar. Remote tile shows "H" fallback letter.</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

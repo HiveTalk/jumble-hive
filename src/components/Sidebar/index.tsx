@@ -22,6 +22,7 @@ import ProfileButton from './ProfileButton'
 import SearchButton from './SearchButton'
 import SettingsButton from './SettingsButton'
 import UpdateButton from './UpdateButton'
+import VideoRoomsButton from './VideoRoomsButton'
 
 export default function PrimaryPageSidebar() {
   const { isSmallScreen } = useScreenSize()
@@ -64,6 +65,7 @@ export default function PrimaryPageSidebar() {
         <SearchButton collapse={sidebarCollapse} />
         <ProfileButton collapse={sidebarCollapse} />
         {pubkey && <BookmarkButton collapse={sidebarCollapse} />}
+        <VideoRoomsButton collapse={sidebarCollapse} />
         <SettingsButton collapse={sidebarCollapse} />
         <PostButton collapse={sidebarCollapse} />
       </div>

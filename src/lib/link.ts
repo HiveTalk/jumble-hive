@@ -105,3 +105,7 @@ export const toDmConversation = (pubkey: string) => {
   const npub = pubkey.startsWith('npub') ? pubkey : nip19.npubEncode(pubkey)
   return `/dms/${npub}`
 }
+
+export const toVideoRoom = (roomName: string) => {
+  return `/video-rooms/${encodeURIComponent(roomName)}`
+}

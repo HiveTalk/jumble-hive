@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>HiveRelay Video Conference — Camera Off Avatar Test</title>
+<style>
+body { font-family: system-ui, sans-serif; background: #1a1a2e; color: #eee; margin: 0; padding: 20px; max-width: 1400px; margin: 0 auto; }
+h1 { color: #e94560; }
+h2 { color: #0f3460; background: #16213e; padding: 10px; border-radius: 8px; margin-top: 30px; }
+img { max-width: 100%; border: 2px solid #333; border-radius: 8px; margin: 10px 0; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.grid > div { background: #16213e; padding: 15px; border-radius: 8px; }
+.grid > div h3 { margin-top: 0; color: #e94560; }
+.desc { color: #aaa; font-size: 14px; margin-bottom: 10px; }
+.passed { color: #4ade80; font-weight: bold; }
+code { background: #0d1117; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<h1>HiveRelay Video Conference — Nostr Avatar Placeholder Test</h1>
+<p class="passed">✓ Test passed (56.3s) — Nostr profile avatars render when camera is off</p>
+<p><strong>User 1:</strong> HiveHost — DiceBear bot avatar at <code>api.dicebear.com/9.x/bottts/png?seed=HiveHost</code></p>
+<p><strong>User 2:</strong> BuzzGuest — DiceBear bot avatar at <code>api.dicebear.com/9.x/bottts/png?seed=BuzzGuest</code></p>
+<p>Both users joined room77 with camera <strong>off</strong>. The <code>NostrParticipantTile</code> renders the Nostr profile avatar as a placeholder image instead of the default LiveKit SVG icon.</p>
+
+<h2>Step 1: User 1 Alone in Room (Camera Off)</h2>
+<div class="grid">
+  <div>
+    <h3>User 1 — Alone, camera off</h3>
+    <p class="desc">Avatar placeholder shows the HiveHost DiceBear bot image</p>
+    <img src="camoff-01-user1-alone.png" alt="User 1 alone with camera off">
+  </div>
+</div>
+
+<h2>Step 2: Both Users in Conference (Camera Off)</h2>
+<div class="grid">
+  <div>
+    <h3>User 1's View (HiveHost)</h3>
+    <p class="desc">Sees both tiles with avatar placeholders. Local tile shows HiveHost avatar img. Remote tile shows "B" fallback (profile fetch in progress).</p>
+    <img src="camoff-02-user1-conference.png" alt="User 1 conference camera off">
+  </div>
+  <div>
+    <h3>User 2's View (BuzzGuest)</h3>
+    <p class="desc">Sees both tiles with avatar placeholders. Local tile shows BuzzGuest avatar img. Remote tile shows "H" fallback (profile fetch in progress).</p>
+    <img src="camoff-02-user2-conference.png" alt="User 2 conference camera off">
+  </div>
+</div>
+
+<h2>Step 3: Final Screenshots</h2>
+<div class="grid">
+  <div>
+    <h3>User 1 Final</h3>
+    <img src="camoff-03-user1-final.png" alt="User 1 final">
+  </div>
+  <div>
+    <h3>User 2 Final</h3>
+    <img src="camoff-03-user2-final.png" alt="User 2 final">
+  </div>
+</div>
+
+<h2>How It Works</h2>
+<p>The <code>NostrParticipantTile</code> component:</p>
+<ol>
+  <li>Reads the participant's LiveKit identity (which HiveRelay sets to the Nostr username)</li>
+  <li>Looks up the avatar URL from <code>NostrProfilesContext</code> (keyed by both pubkey and username)</li>
+  <li>Renders an <code>&lt;img&gt;</code> with the avatar URL inside <code>.lk-participant-placeholder</code></li>
+  <li>The LiveKit CSS shows the placeholder (opacity: 1) when <code>data-lk-video-muted="true"</code></li>
+  <li>Falls back to a letter avatar (first letter of username) if no avatar URL is available</li>
+</ol>
+<p>The <code>NostrProfilesSync</code> component populates the context:</p>
+<ul>
+  <li>Local user's profile is added immediately from <code>useNostr().profile</code></li>
+  <li>Remote participants' profiles are fetched from Nostr relays (kind 0 metadata) via <code>client.fetchProfile()</code></li>
+</ul>
+
+<h2>Previous Test: Camera On (with video)</h2>
+<p>See the <a href="index-camera-on.html">camera-on test results</a> for screenshots with video enabled.</p>
+
+</body>
+</html>

@@ -26,6 +26,7 @@ import StandaloneEmojiEditorPage from '@/pages/secondary/StandaloneEmojiEditorPa
 import SystemSettingsPage from '@/pages/secondary/SystemSettingsPage'
 import TranslationPage from '@/pages/secondary/TranslationPage'
 import UserAggregationDetailPage from '@/pages/secondary/UserAggregationDetailPage'
+import VideoRoomPage from '@/pages/secondary/VideoRoomPage'
 import WalletPage from '@/pages/secondary/WalletPage'
 import { match } from 'path-to-regexp'
 import { isValidElement } from 'react'
@@ -65,6 +66,7 @@ const SECONDARY_ROUTE_CONFIGS: {
   { path: '/bookmarks', element: <BookmarkPage /> },
   { path: '/follow-packs/:id', element: <FollowPackPage /> },
   { path: '/user-aggregation/:feedId/:npub', element: <UserAggregationDetailPage /> },
+  { path: '/video-rooms/:roomName', element: <VideoRoomPage />, hideBottomBar: true },
   { path: '/dms/:pubkey', element: <DmConversationPage />, hideBottomBar: true }
 ]
 

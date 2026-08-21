@@ -1,4 +1,11 @@
 import './index.css'
+// LiveKit components styles — provides the visual theme for VideoConference,
+// PreJoin, ControlBar, and ParticipantTile prefab components. The
+// data-lk-theme="default" attribute on the container activates the CSS
+// variables defined in the default theme.
+import '@livekit/components-styles/themes/default'
+import '@livekit/components-styles/components'
+import '@livekit/components-styles/prefabs'
 import './polyfill'
 
 import { restoreElectronLocalStorage } from './lib/electron-local-storage'

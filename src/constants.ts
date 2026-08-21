@@ -614,3 +614,20 @@ export const POMEGRANATE_OPERATOR_URLS = [
   'https://po.f7z.io/',
   'https://po.yakihonne.com/'
 ]
+
+// HiveRelay — Nostr relay (NIP-42/NIP-53) fronting LiveKit that mints access
+// tokens and owns the room registry. The relay serves CORS with
+// Access-Control-Allow-Origin: * on all endpoints, so browser clients call it
+// directly — no proxy needed. Override via VITE_HIVERELAY_API_BASE.
+export const HIVERELAY_API_BASE =
+  (import.meta.env.VITE_HIVERELAY_API_BASE as string | undefined) ??
+  'https://premrelay.exe.xyz'
+
+// WebSocket URL for publishing kind-30312 room announcements.
+export const HIVERELAY_RELAY_URL = 'wss://premrelay.exe.xyz/'
+
+// Kind 27235 (NIP-98 HTTP auth) reused by HiveRelay for both standard NIP-98
+// and its "action event" challenge flow (extra action/nonce tags).
+// Kind 30312 is the NIP-53 meeting-space announcement.
+export const HIVERELAY_ACTION_KIND = 27235
+export const HIVERELAY_ROOM_ANNOUNCEMENT_KIND = 30312

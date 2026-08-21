@@ -34,3 +34,9 @@ electron-builder.env
 .vercel
 
 .claude/
+
+# Playwright test artifacts
+test-results/
+playwright-report/
+
+e2e/.second-nsec.txt

@@ -1196,6 +1196,10 @@ export default {
     'Delete room': 'Delete room',
     'Are you sure you want to delete "{{room}}"? This will remove the LiveKit room, access policies, and Nostr announcement. This action cannot be undone.': 'Are you sure you want to delete "{{room}}"? This will remove the LiveKit room, access policies, and Nostr announcement. This action cannot be undone.',
     'Room "{{room}}" deleted': 'Room "{{room}}" deleted',
-    'Failed to delete room': 'Failed to delete room'
+    'Failed to delete room': 'Failed to delete room',
+    'Invoice copied': 'Invoice copied',
+    'Copy invoice': 'Copy invoice',
+    'Open in Lightning wallet': 'Open in Lightning wallet',
+    '{{quota}} free rooms available without a subscription.': '{{quota}} free rooms available without a subscription.'
   }
 }

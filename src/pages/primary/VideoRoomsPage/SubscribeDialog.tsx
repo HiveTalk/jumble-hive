@@ -8,14 +8,15 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import QrCode from '@/components/QrCode'
 import hiverelayService from '@/services/hiverelay.service'
 import {
   THiveRelayInvoice,
   THiveRelayPaymentStatusResponse,
   THiveRelayPlan
 } from '@/types/hiverelay'
-import { CheckCircle2, Loader2, Zap } from 'lucide-react'
-import { useState } from 'react'
+import { CheckCircle2, Copy, Loader2, RefreshCw, Zap } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -33,6 +34,7 @@ export default function SubscribeDialog({
   const { t } = useTranslation()
   const [phase, setPhase] = useState<TPhase>('plans')
   const [plans, setPlans] = useState<THiveRelayPlan[]>([])
+  const [freeQuota, setFreeQuota] = useState(0)
   const [invoice, setInvoice] = useState<THiveRelayInvoice | null>(null)
   const [pollStatus, setPollStatus] = useState<string>('')
   const [loading, setLoading] = useState(false)
@@ -41,6 +43,7 @@ export default function SubscribeDialog({
   const reset = () => {
     setPhase('plans')
     setPlans([])
+    setFreeQuota(0)
     setInvoice(null)
     setPollStatus('')
     setLoading(false)
@@ -53,6 +56,7 @@ export default function SubscribeDialog({
     try {
       const res = await hiverelayService.getPlans()
       setPlans(res.plans)
+      setFreeQuota(res.free_quota)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -60,11 +64,16 @@ export default function SubscribeDialog({
     }
   }
 
-  const handleOpenChange = (open: boolean) => {
+  // Load plans when the dialog opens (useEffect, not onOpenChange,
+  // because onOpenChange may not fire when the open prop changes externally)
+  useEffect(() => {
     if (open) {
       reset()
       loadPlans()
     }
+  }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleOpenChange = (open: boolean) => {
     onOpenChange(open)
   }
 
@@ -129,12 +138,26 @@ export default function SubscribeDialog({
             {/* Plans phase */}
             {phase === 'plans' && (
               <>
+                {freeQuota > 0 && !loading && !error && (
+                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
+                    {t('{{quota}} free rooms available without a subscription.', { quota: freeQuota })}
+                  </div>
+                )}
                 {loading && (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="size-6 animate-spin text-muted-foreground" />
                   </div>
                 )}
-                {!loading &&
+                {!loading && error && (
+                  <div className="flex flex-col items-center gap-3 py-6 text-center">
+                    <div className="text-sm text-destructive">{error}</div>
+                    <Button variant="outline" size="sm" onClick={loadPlans}>
+                      <RefreshCw className="size-4" />
+                      {t('Retry')}
+                    </Button>
+                  </div>
+                )}
+                {!loading && !error &&
                   plans.map((plan) => (
                     <button
                       key={plan.id}
@@ -155,7 +178,7 @@ export default function SubscribeDialog({
                       <Zap className="size-4 text-primary" />
                     </button>
                   ))}
-                {!loading && plans.length === 0 && !error && (
+                {!loading && !error && plans.length === 0 && (
                   <div className="py-4 text-center text-sm text-muted-foreground">
                     {t('No plans available.')}
                   </div>
@@ -163,38 +186,55 @@ export default function SubscribeDialog({
               </>
             )}
 
-            {/* Invoice phase — show BOLT11 for user to pay */}
-            {phase === 'invoice' && invoice && (
-              <div className="space-y-3">
+            {/* Invoice phase — show BOLT11 + QR for user to pay */}
+            {(phase === 'invoice' || phase === 'polling') && invoice && (
+              <div className="space-y-4">
                 <div className="text-sm text-muted-foreground">
                   {t('Scan or paste this invoice in your Lightning wallet')}
                 </div>
-                <Input
-                  readOnly
-                  value={invoice.bolt11}
-                  className="text-xs"
-                  onClick={(e) => e.currentTarget.select()}
-                />
-                <div className="flex items-center gap-2 text-sm">
-                  <Loader2 className="size-4 animate-spin" />
-                  <span>{t('Waiting for payment...')}</span>
-                </div>
-              </div>
-            )}
 
-            {/* Polling phase */}
-            {phase === 'polling' && invoice && (
-              <div className="space-y-3">
-                <Input
-                  readOnly
-                  value={invoice.bolt11}
-                  className="text-xs"
-                  onClick={(e) => e.currentTarget.select()}
-                />
-                <div className="flex items-center gap-2 text-sm">
+                {/* QR code */}
+                <div className="flex justify-center">
+                  <QrCode value={invoice.bolt11} size={200} />
+                </div>
+
+                {/* Invoice text (copyable) */}
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value={invoice.bolt11}
+                    className="text-xs"
+                    onClick={(e) => e.currentTarget.select()}
+                  />
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(invoice.bolt11)
+                      toast.success(t('Invoice copied'))
+                    }}
+                    title={t('Copy invoice')}
+                  >
+                    <Copy className="size-4" />
+                  </Button>
+                </div>
+
+                {/* Open in wallet link */}
+                <a
+                  href={`lightning:${invoice.bolt11}`}
+                  className="block w-full rounded-lg border border-primary/50 bg-primary/10 p-2 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/20"
+                >
+                  {t('Open in Lightning wallet')}
+                </a>
+
+                {/* Waiting indicator */}
+                <div className="flex items-center justify-center gap-2 text-sm">
                   <Loader2 className="size-4 animate-spin" />
                   <span>
-                    {t('Waiting for payment...')} ({pollStatus})
+                    {phase === 'polling'
+                      ? `${t('Waiting for payment...')} (${pollStatus})`
+                      : t('Waiting for payment...')}
                   </span>
                 </div>
               </div>

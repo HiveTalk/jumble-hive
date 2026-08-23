@@ -1,9 +1,4 @@
-<div align="center">
-  <picture>
-    <img src="./resources/logo-light.svg" alt="Jumble Logo" width="400" />
-  </picture>
-  <p>logo designed by <a href="http://wolfertdan.com/">Daniel David</a></p>
-</div>
+
 
 # Jumble-Hive
 

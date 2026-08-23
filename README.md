@@ -5,7 +5,11 @@
   <p>logo designed by <a href="http://wolfertdan.com/">Daniel David</a></p>
 </div>
 
-# Jumble
+# Jumble-Hive
+
+A fork of jumble with a basic hivetalk integration
+A subscription to a hivetalk relay required to create a permanent room; 
+joining open rooms is free
 
 A user-friendly Nostr client for exploring relay feeds
 

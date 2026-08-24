@@ -74,7 +74,7 @@
     "@tiptap/starter-kit": "^2.27.2",
     "@tiptap/suggestion": "^2.27.2",
     "@webbtc/webln-types": "^3.0.0",
-    "blossom-client-sdk": "^4.1.0",
+    "blossom-client-sdk": "^5.1.0",
     "blurhash": "^2.0.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

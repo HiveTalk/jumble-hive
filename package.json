@@ -156,6 +156,6 @@
     "vitest": "^3.2.4"
   },
   "optionalDependencies": {
-    "electron": "^41.5.0"
+    "electron": "^41.10.3"
   }
 }

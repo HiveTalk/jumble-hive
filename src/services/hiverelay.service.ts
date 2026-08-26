@@ -131,7 +131,8 @@ class HiveRelayService {
   /**
    * Proofs of a *paid but unredeemed* invoice. They outlive the page so a
    * failed or interrupted redeem can be replayed instead of paying again, and
-   * are dropped as soon as the relay reports the subscription settled.
+   * are dropped as soon as the relay reports a state it will not move away
+   * from — settled, expired or failed. See `settleSubscribe`.
    */
   private readL402Proof(pubkey: string, plan: THiveRelayPlanId): TL402Proof | null {
     try {

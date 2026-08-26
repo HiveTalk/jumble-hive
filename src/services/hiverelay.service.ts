@@ -35,6 +35,17 @@ type TSubscribeResponse = {
 
 const L402_PROOF_STORAGE_PREFIX = 'hiverelay.l402.proof.'
 
+/**
+ * States the relay will never move away from. A proof for an intent in one of
+ * these is worthless: replaying it can only fail, so it must be dropped or the
+ * user is locked out of buying a fresh invoice.
+ */
+type TTerminalPaymentStatus = 'expired' | 'failed'
+const TERMINAL_PAYMENT_STATUSES: TTerminalPaymentStatus[] = ['expired', 'failed']
+
+const isTerminalPaymentStatus = (status: string): status is TTerminalPaymentStatus =>
+  (TERMINAL_PAYMENT_STATUSES as string[]).includes(status)
+
 type TAction =
   | 'subscribe'
   | 'create-room'
@@ -426,8 +437,14 @@ class HiveRelayService {
   /**
    * Resolves a redeemed L402 payment to its final state: the relay may answer
    * `pending` while it reconciles settlement, so poll it out rather than report
-   * failure for an invoice that is already paid. The proof is only discarded
-   * once the subscription is settled.
+   * failure for an invoice that is already paid.
+   *
+   * The proof is discarded on any state the relay will not move away from —
+   * `settled` (it did its job) as well as `expired`/`failed` (it never will).
+   * Keeping a dead proof would make every later subscribe replay it forever
+   * instead of buying a new invoice. It is kept only when the outcome is
+   * genuinely unknown (polling timeout, network error), which is the case this
+   * storage exists for.
    */
   private async settleSubscribe(
     pubkey: string,
@@ -436,12 +453,21 @@ class HiveRelayService {
   ): Promise<THiveRelayPaymentStatusResponse> {
     let result = body
     if (result.status === 'pending' && result.intent_id) {
-      result = await this.pollPaymentUntilSettled(result.intent_id, {
-        intervalMs: 3000,
-        timeoutMs: 10 * 60 * 1000
-      })
+      try {
+        result = await this.pollPaymentUntilSettled(result.intent_id, {
+          intervalMs: 3000,
+          timeoutMs: 10 * 60 * 1000
+        })
+      } catch (e) {
+        if (e instanceof HiveRelayError && e.paymentStatus) {
+          this.clearL402Proof(pubkey, plan)
+        }
+        throw e
+      }
     }
-    if (result.status === 'settled') this.clearL402Proof(pubkey, plan)
+    if (result.status === 'settled' || isTerminalPaymentStatus(result.status)) {
+      this.clearL402Proof(pubkey, plan)
+    }
     return result
   }
 
@@ -482,8 +508,8 @@ class HiveRelayService {
       last = await this.getPaymentStatus(intentId)
       opts.onPoll?.(last)
       if (last.status === 'settled') return last
-      if (last.status === 'expired' || last.status === 'failed') {
-        throw new HiveRelayError(`Payment ${last.status}`, 402)
+      if (isTerminalPaymentStatus(last.status)) {
+        throw new HiveRelayError(`Payment ${last.status}`, 402, undefined, last.status)
       }
       await new Promise((r) => setTimeout(r, intervalMs))
     }
@@ -612,12 +638,24 @@ class HiveRelayService {
 export class HiveRelayError extends Error {
   status: number
   gate?: THiveRelayGateError
+  /**
+   * Set when the relay reported a *terminal* payment state (`expired`/`failed`)
+   * rather than an inconclusive one (timeout, network). Callers use it to
+   * decide whether a stored L402 proof is dead and safe to discard.
+   */
+  paymentStatus?: TTerminalPaymentStatus
 
-  constructor(message: string, status: number, gate?: THiveRelayGateError) {
+  constructor(
+    message: string,
+    status: number,
+    gate?: THiveRelayGateError,
+    paymentStatus?: TTerminalPaymentStatus
+  ) {
     super(message)
     this.name = 'HiveRelayError'
     this.status = status
     this.gate = gate
+    this.paymentStatus = paymentStatus
   }
 }
 

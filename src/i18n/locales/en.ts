@@ -1203,6 +1203,8 @@ export default {
     '{{quota}} free rooms available without a subscription.': '{{quota}} free rooms available without a subscription.',
     'Rooms: {{used}} / {{quota}}': 'Rooms: {{used}} / {{quota}}',
     'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.': 'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.',
-    'Payment was not settled': 'Payment was not settled'
+    'Payment was not settled': 'Payment was not settled',
+    'Complete the payment in your wallet...': 'Complete the payment in your wallet...',
+    'No plans available.': 'No plans available.'
   }
 }

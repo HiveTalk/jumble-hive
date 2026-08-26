@@ -34,8 +34,12 @@ export interface THiveRelayPlansResponse {
 export interface THiveRelaySubscription {
   pubkey: string
   plan: string
-  status: string
+  status: 'none' | 'active' | 'expired' | 'cancelled' | string
   room_quota: number
+  rooms_in_use?: number
+  free_quota?: number
+  grace_days?: number
+  in_grace?: boolean
   paid_until: string | null
   entitled: boolean
   can_record?: boolean

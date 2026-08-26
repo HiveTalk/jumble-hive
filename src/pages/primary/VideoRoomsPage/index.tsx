@@ -22,7 +22,7 @@ import {
   THiveRelaySubscription
 } from '@/types/hiverelay'
 import { CheckCircle2, Circle, Loader2, Plus, RefreshCw, Trash2, Users, Video, Zap } from 'lucide-react'
-import { forwardRef, useCallback, useEffect, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import CreateRoomDialog from './CreateRoomDialog'
@@ -42,9 +42,11 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
   const [subscribeOpen, setSubscribeOpen] = useState(false)
   const [deletingRoom, setDeletingRoom] = useState<THiveRelayOwnedRoom | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const refreshSeqRef = useRef(0)
 
   const refresh = useCallback(async () => {
     if (!pubkey) return
+    const seq = ++refreshSeqRef.current
     setLoading(true)
     try {
       const [sub, rooms, live] = await Promise.all([
@@ -56,17 +58,27 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
         hiverelayService.getRoomsByPubkey(pubkey).catch(() => [] as THiveRelayOwnedRoom[]),
         hiverelayService.listRooms().catch(() => [] as THiveRelayRoomSummary[])
       ])
+      // Discard stale results from a previous account (switched away mid-fetch).
+      if (seq !== refreshSeqRef.current) return
       setSubscription(sub)
       setOwnedRooms(rooms)
       setLiveRooms(live)
     } catch (e) {
+      if (seq !== refreshSeqRef.current) return
       toast.error(e instanceof Error ? e.message : String(e))
     } finally {
-      setLoading(false)
+      if (seq === refreshSeqRef.current) setLoading(false)
     }
   }, [pubkey])
 
+  // Clear stale state immediately when the active account changes, before the
+  // async refresh lands. Without this, switching from a subscribed account to
+  // an unsubscribed one briefly (or permanently, if the fetch errors) shows the
+  // previous account's subscription as active for the new account.
   useEffect(() => {
+    setSubscription(null)
+    setOwnedRooms([])
+    setLiveRooms([])
     if (pubkey) refresh()
   }, [pubkey, refresh])
 
@@ -103,6 +115,9 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
   }
 
   const entitled = subscription?.entitled ?? false
+  const roomQuota = subscription?.room_quota ?? 0
+  const roomsInUse = subscription?.rooms_in_use ?? ownedRooms.length
+  const atRoomQuota = roomsInUse >= roomQuota && roomQuota > 0
 
   const confirmDelete = async () => {
     if (!deletingRoom) return
@@ -182,6 +197,11 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
                     ? t('Plan: {{plan}}', { plan: subscription.plan.replace(/_/g, ' ') })
                     : t('Subscribe to create and own rooms.')}
                 </div>
+                {entitled && roomQuota > 0 && (
+                  <div className={entitled ? 'text-xs text-emerald-600/70 dark:text-emerald-400/70' : 'text-xs text-muted-foreground'}>
+                    {t('Rooms: {{used}} / {{quota}}', { used: roomsInUse, quota: roomQuota })}
+                  </div>
+                )}
               </div>
               {!entitled && (
                 <Button size="sm" onClick={() => setSubscribeOpen(true)}>
@@ -199,13 +219,15 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {entitled
-                    ? t('Register a permanent room you own.')
+                    ? atRoomQuota
+                      ? t('Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.', { used: roomsInUse, quota: roomQuota })
+                      : t('Register a permanent room you own.')
                     : t('Requires an active subscription.')}
                 </p>
                 <Button
                   className="w-full"
                   onClick={() => setCreateOpen(true)}
-                  disabled={!entitled}
+                  disabled={!entitled || atRoomQuota}
                 >
                   <Plus className="size-4" />
                   {t('Create room')}

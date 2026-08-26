@@ -83,6 +83,22 @@ class HiveRelayService {
     return { macaroon: macaroonMatch[1], invoice: invoiceMatch[1] }
   }
 
+  /**
+   * The challenge also travels in the 402 body, which is the only copy a
+   * cross-origin caller can rely on: `WWW-Authenticate` is not a CORS-safelisted
+   * response header, so it is invisible unless the relay lists it in
+   * `Access-Control-Expose-Headers`.
+   */
+  private parseL402Body(body: unknown): { macaroon: string; invoice: string } | null {
+    if (!body || typeof body !== 'object') return null
+    const record = body as Record<string, unknown>
+    const macaroon = record.macaroon
+    const invoice = record.invoice ?? record.bolt11
+    if (typeof macaroon !== 'string' || typeof invoice !== 'string') return null
+    if (!macaroon || !invoice) return null
+    return { macaroon, invoice }
+  }
+
   private l402AuthHeader(macaroon: string, preimage: string): string {
     return `L402 ${macaroon}:${preimage}`
   }
@@ -149,6 +165,16 @@ class HiveRelayService {
       Object.entries(query).forEach(([k, v]) => url.searchParams.set(k, v))
     }
     return url.toString()
+  }
+
+  /** JSON.parse that yields undefined instead of throwing on a non-JSON body. */
+  private parseJson<T>(text: string): T | undefined {
+    if (!text) return undefined
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      return undefined
+    }
   }
 
   private parseGate(body: string): THiveRelayGateError | undefined {
@@ -266,10 +292,13 @@ class HiveRelayService {
     }
     const res = await fetch(url, { method: 'POST', headers, body: rawBody })
     const text = await res.text()
-    const body = (text ? JSON.parse(text) : {}) as THiveRelayPaymentStatusResponse & { error?: string }
+    const body =
+      this.parseJson<THiveRelayPaymentStatusResponse & { error?: string }>(text) ??
+      ({} as THiveRelayPaymentStatusResponse & { error?: string })
 
     if (res.status === 402) {
-      const l402 = this.parseL402Header(res.headers.get('WWW-Authenticate'))
+      const l402 =
+        this.parseL402Header(res.headers.get('WWW-Authenticate')) ?? this.parseL402Body(body)
       if (l402) {
         const paid = await lightningService.payInvoice(l402.invoice)
         if (!paid?.preimage) {
@@ -289,16 +318,28 @@ class HiveRelayService {
         })
         const retryText = await retry.text()
         if (!retry.ok) {
-          const err = retryText || retry.statusText
-          throw new HiveRelayError(err, retry.status)
+          const gate = this.parseGate(retryText)
+          const err = (gate?.error ?? retryText.trim()) || retry.statusText
+          throw new HiveRelayError(err, retry.status, gate)
         }
-        return JSON.parse(retryText) as THiveRelayPaymentStatusResponse
+        const settled = this.parseJson<THiveRelayPaymentStatusResponse>(retryText)
+        if (!settled) {
+          throw new HiveRelayError(
+            'HiveRelay returned an unreadable payment response',
+            retry.status
+          )
+        }
+        return settled
       }
+      throw new HiveRelayError(
+        'HiveRelay asked for payment but sent no L402 invoice we could read',
+        402
+      )
     }
 
     if (!res.ok) {
       const gate = this.parseGate(text)
-      const message = (gate?.error ?? body.error ?? text) || res.statusText
+      const message = (gate?.error ?? body.error ?? text.trim()) || res.statusText
       throw new HiveRelayError(message, res.status, gate)
     }
     return body

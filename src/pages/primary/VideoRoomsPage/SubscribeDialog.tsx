@@ -73,16 +73,15 @@ export default function SubscribeDialog({
     setPhase('paying')
     try {
       const result = await hiverelayService.subscribe(planId)
-      if (result.status === 'settled') {
-        setPhase('settled')
-        toast.success(t('Payment settled!'))
-        setTimeout(() => {
-          onSubscribed()
-          onOpenChange(false)
-        }, 1500)
-      } else {
-        throw new Error('Payment was not settled')
+      if (result.status !== 'settled') {
+        throw new Error(t('Payment was not settled'))
       }
+      setPhase('settled')
+      toast.success(t('Payment settled!'))
+      setTimeout(() => {
+        onSubscribed()
+        onOpenChange(false)
+      }, 1500)
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       setError(msg)
@@ -100,9 +99,7 @@ export default function SubscribeDialog({
             <Zap className="size-5" />
             {t('Subscribe')}
           </DialogTitle>
-          <DialogDescription>
-            {t('Subscribe to create and own rooms.')}
-          </DialogDescription>
+          <DialogDescription>{t('Subscribe to create and own rooms.')}</DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh]">
@@ -111,35 +108,38 @@ export default function SubscribeDialog({
             {phase === 'plans' && (
               <>
                 {freeQuota > 0 && !loading && !error && (
-                  <div className="rounded-lg border border-primary/30 bg-primary/5 p-3 text-xs text-muted-foreground">
-                    {t('{{quota}} free rooms available without a subscription.', { quota: freeQuota })}
+                  <div className="border-primary/30 bg-primary/5 text-muted-foreground rounded-lg border p-3 text-xs">
+                    {t('{{quota}} free rooms available without a subscription.', {
+                      quota: freeQuota
+                    })}
                   </div>
                 )}
                 {loading && (
                   <div className="flex items-center justify-center py-8">
-                    <Loader2 className="size-6 animate-spin text-muted-foreground" />
+                    <Loader2 className="text-muted-foreground size-6 animate-spin" />
                   </div>
                 )}
                 {!loading && error && (
                   <div className="flex flex-col items-center gap-3 py-6 text-center">
-                    <div className="text-sm text-destructive">{error}</div>
+                    <div className="text-destructive text-sm">{error}</div>
                     <Button variant="outline" size="sm" onClick={loadPlans}>
                       <RefreshCw className="size-4" />
                       {t('Retry')}
                     </Button>
                   </div>
                 )}
-                {!loading && !error &&
+                {!loading &&
+                  !error &&
                   plans.map((plan) => (
                     <button
                       key={plan.id}
                       onClick={() => buyPlan(plan.id)}
                       disabled={loading}
-                      className="flex w-full items-center justify-between rounded-xl border bg-background p-4 text-start transition-colors hover:bg-accent/40 disabled:opacity-50"
+                      className="bg-background hover:bg-accent/40 flex w-full items-center justify-between rounded-xl border p-4 text-start transition-colors disabled:opacity-50"
                     >
                       <div className="flex flex-col gap-1">
                         <div className="font-semibold">{plan.id.replace(/_/g, ' ')}</div>
-                        <div className="text-xs text-muted-foreground">
+                        <div className="text-muted-foreground text-xs">
                           {t('{{days}} days · {{rooms}} rooms · {{sats}} sats', {
                             days: plan.days,
                             rooms: plan.room_quota,
@@ -147,11 +147,11 @@ export default function SubscribeDialog({
                           })}
                         </div>
                       </div>
-                      <Zap className="size-4 text-primary" />
+                      <Zap className="text-primary size-4" />
                     </button>
                   ))}
                 {!loading && !error && plans.length === 0 && (
-                  <div className="py-4 text-center text-sm text-muted-foreground">
+                  <div className="text-muted-foreground py-4 text-center text-sm">
                     {t('No plans available.')}
                   </div>
                 )}
@@ -161,8 +161,8 @@ export default function SubscribeDialog({
             {/* Paying phase — the wallet modal is open */}
             {phase === 'paying' && (
               <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <Loader2 className="size-8 animate-spin text-primary" />
-                <div className="text-sm text-muted-foreground">
+                <Loader2 className="text-primary size-8 animate-spin" />
+                <div className="text-muted-foreground text-sm">
                   {t('Complete the payment in your wallet...')}
                 </div>
               </div>
@@ -171,7 +171,7 @@ export default function SubscribeDialog({
             {/* Settled phase */}
             {phase === 'settled' && (
               <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <CheckCircle2 className="size-10 text-primary" />
+                <CheckCircle2 className="text-primary size-10" />
                 <div className="font-semibold">{t('Payment settled!')}</div>
               </div>
             )}
@@ -179,7 +179,7 @@ export default function SubscribeDialog({
             {/* Error phase */}
             {phase === 'error' && (
               <div className="flex flex-col items-center gap-3 py-6 text-center">
-                <div className="text-sm text-destructive">{error}</div>
+                <div className="text-destructive text-sm">{error}</div>
                 <Button variant="outline" onClick={reset}>
                   {t('Go back')}
                 </Button>

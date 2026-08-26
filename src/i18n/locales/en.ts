@@ -1202,6 +1202,8 @@ export default {
     'Open in Lightning wallet': 'Open in Lightning wallet',
     '{{quota}} free rooms available without a subscription.': '{{quota}} free rooms available without a subscription.',
     'Rooms: {{used}} / {{quota}}': 'Rooms: {{used}} / {{quota}}',
-    'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.': 'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.'
+    'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.':
+      'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.',
+    'Payment was not settled': 'Payment was not settled'
   }
 }

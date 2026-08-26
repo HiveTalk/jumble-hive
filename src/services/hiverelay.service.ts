@@ -8,7 +8,6 @@ import {
   THiveRelayGateError,
   THiveRelayGetTokenRequest,
   THiveRelayGetTokenResponse,
-  THiveRelayInvoice,
   THiveRelayOwnedRoom,
   THiveRelayPaymentStatusResponse,
   THiveRelayPlanId,
@@ -24,6 +23,7 @@ import { sha256 } from '@noble/hashes/sha2'
 import { bytesToHex } from '@noble/hashes/utils'
 import dayjs from 'dayjs'
 import { Event } from 'nostr-tools'
+import lightningService from '@/services/lightning.service'
 
 type TAction =
   | 'subscribe'
@@ -69,6 +69,22 @@ class HiveRelayService {
 
   async getPublicKey(): Promise<string> {
     return this.signer.getPublicKey()
+  }
+
+  // ---- L402 helpers ----------------------------------------------------
+
+  private parseL402Header(header: string | null): { macaroon: string; invoice: string } | null {
+    const prefix = 'L402 '
+    if (!header || !header.startsWith(prefix)) return null
+    const rest = header.slice(prefix.length)
+    const macaroonMatch = /macaroon="([^"]+)"/.exec(rest)
+    const invoiceMatch = /invoice="([^"]+)"/.exec(rest)
+    if (!macaroonMatch || !invoiceMatch) return null
+    return { macaroon: macaroonMatch[1], invoice: invoiceMatch[1] }
+  }
+
+  private l402AuthHeader(macaroon: string, preimage: string): string {
+    return `L402 ${macaroon}:${preimage}`
   }
 
   // ---- Signing helpers -------------------------------------------------
@@ -231,14 +247,61 @@ class HiveRelayService {
   }
 
   /**
-   * POST /api/subscribe {plan} with action="subscribe". Returns a BOLT11
-   * invoice bound to the caller's pubkey and plan. At most one pending invoice
-   * per pubkey; asking again returns the same one (409 pending_invoice).
+   * POST /api/subscribe {plan} with action="subscribe". The relay now returns
+   * an L402 402 challenge. We pay the invoice, obtain the preimage, and retry
+   * the signed action event with the L402 proof in the X-L402 header (the
+   * standard Authorization header is already used for the Nostr action event).
    */
-  async subscribe(plan: THiveRelayPlanId): Promise<THiveRelayInvoice> {
-    return this.actionRequest<THiveRelayInvoice>('POST', '/api/subscribe', 'subscribe', {
-      body: { plan }
-    })
+  async subscribe(plan: THiveRelayPlanId): Promise<THiveRelayPaymentStatusResponse> {
+    const path = '/api/subscribe'
+    const url = this.buildUrl(path)
+    const rawBody = JSON.stringify({ plan })
+    const { nonce, challenge } = await this.getChallenge()
+    const auth = await this.signActionEvent(url, 'POST', rawBody, 'subscribe', nonce)
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: auth,
+      'X-Challenge': challenge
+    }
+    const res = await fetch(url, { method: 'POST', headers, body: rawBody })
+    const text = await res.text()
+    const body = (text ? JSON.parse(text) : {}) as THiveRelayPaymentStatusResponse & { error?: string }
+
+    if (res.status === 402) {
+      const l402 = this.parseL402Header(res.headers.get('WWW-Authenticate'))
+      if (l402) {
+        const paid = await lightningService.payInvoice(l402.invoice)
+        if (!paid?.preimage) {
+          throw new HiveRelayError('Payment cancelled', 402)
+        }
+        const { nonce: nonce2, challenge: challenge2 } = await this.getChallenge()
+        const auth2 = await this.signActionEvent(url, 'POST', rawBody, 'subscribe', nonce2)
+        const retry = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: auth2,
+            'X-Challenge': challenge2,
+            'X-L402': this.l402AuthHeader(l402.macaroon, paid.preimage)
+          },
+          body: rawBody
+        })
+        const retryText = await retry.text()
+        if (!retry.ok) {
+          const err = retryText || retry.statusText
+          throw new HiveRelayError(err, retry.status)
+        }
+        return JSON.parse(retryText) as THiveRelayPaymentStatusResponse
+      }
+    }
+
+    if (!res.ok) {
+      const gate = this.parseGate(text)
+      const message = (gate?.error ?? body.error ?? text) || res.statusText
+      throw new HiveRelayError(message, res.status, gate)
+    }
+    return body
   }
 
   /**

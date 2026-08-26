@@ -6,21 +6,15 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import QrCode from '@/components/QrCode'
 import hiverelayService from '@/services/hiverelay.service'
-import {
-  THiveRelayInvoice,
-  THiveRelayPaymentStatusResponse,
-  THiveRelayPlan
-} from '@/types/hiverelay'
-import { CheckCircle2, Copy, Loader2, RefreshCw, Zap } from 'lucide-react'
+import { THiveRelayPlan } from '@/types/hiverelay'
+import { CheckCircle2, Loader2, RefreshCw, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
-type TPhase = 'plans' | 'invoice' | 'polling' | 'settled' | 'error'
+type TPhase = 'plans' | 'paying' | 'settled' | 'error'
 
 export default function SubscribeDialog({
   open,
@@ -35,8 +29,6 @@ export default function SubscribeDialog({
   const [phase, setPhase] = useState<TPhase>('plans')
   const [plans, setPlans] = useState<THiveRelayPlan[]>([])
   const [freeQuota, setFreeQuota] = useState(0)
-  const [invoice, setInvoice] = useState<THiveRelayInvoice | null>(null)
-  const [pollStatus, setPollStatus] = useState<string>('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,8 +36,6 @@ export default function SubscribeDialog({
     setPhase('plans')
     setPlans([])
     setFreeQuota(0)
-    setInvoice(null)
-    setPollStatus('')
     setLoading(false)
     setError(null)
   }
@@ -80,31 +70,9 @@ export default function SubscribeDialog({
   const buyPlan = async (planId: string) => {
     setLoading(true)
     setError(null)
+    setPhase('paying')
     try {
-      const inv = await hiverelayService.subscribe(planId)
-      setInvoice(inv)
-      setPhase('invoice')
-      // Start polling immediately
-      pollPayment(inv.intent_id)
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e)
-      setError(msg)
-      setPhase('error')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const pollPayment = async (intentId: string) => {
-    setPhase('polling')
-    try {
-      const result = await hiverelayService.pollPaymentUntilSettled(intentId, {
-        intervalMs: 3000,
-        timeoutMs: 10 * 60 * 1000,
-        onPoll: (s: THiveRelayPaymentStatusResponse) => {
-          setPollStatus(s.status)
-        }
-      })
+      const result = await hiverelayService.subscribe(planId)
       if (result.status === 'settled') {
         setPhase('settled')
         toast.success(t('Payment settled!'))
@@ -112,11 +80,15 @@ export default function SubscribeDialog({
           onSubscribed()
           onOpenChange(false)
         }, 1500)
+      } else {
+        throw new Error('Payment was not settled')
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
       setError(msg)
       setPhase('error')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -186,56 +158,12 @@ export default function SubscribeDialog({
               </>
             )}
 
-            {/* Invoice phase — show BOLT11 + QR for user to pay */}
-            {(phase === 'invoice' || phase === 'polling') && invoice && (
-              <div className="space-y-4">
+            {/* Paying phase — the wallet modal is open */}
+            {phase === 'paying' && (
+              <div className="flex flex-col items-center gap-3 py-6 text-center">
+                <Loader2 className="size-8 animate-spin text-primary" />
                 <div className="text-sm text-muted-foreground">
-                  {t('Scan or paste this invoice in your Lightning wallet')}
-                </div>
-
-                {/* QR code */}
-                <div className="flex justify-center">
-                  <QrCode value={invoice.bolt11} size={200} />
-                </div>
-
-                {/* Invoice text (copyable) */}
-                <div className="flex gap-2">
-                  <Input
-                    readOnly
-                    value={invoice.bolt11}
-                    className="text-xs"
-                    onClick={(e) => e.currentTarget.select()}
-                  />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="shrink-0"
-                    onClick={() => {
-                      navigator.clipboard.writeText(invoice.bolt11)
-                      toast.success(t('Invoice copied'))
-                    }}
-                    title={t('Copy invoice')}
-                  >
-                    <Copy className="size-4" />
-                  </Button>
-                </div>
-
-                {/* Open in wallet link */}
-                <a
-                  href={`lightning:${invoice.bolt11}`}
-                  className="block w-full rounded-lg border border-primary/50 bg-primary/10 p-2 text-center text-sm font-medium text-primary transition-colors hover:bg-primary/20"
-                >
-                  {t('Open in Lightning wallet')}
-                </a>
-
-                {/* Waiting indicator */}
-                <div className="flex items-center justify-center gap-2 text-sm">
-                  <Loader2 className="size-4 animate-spin" />
-                  <span>
-                    {phase === 'polling'
-                      ? `${t('Waiting for payment...')} (${pollStatus})`
-                      : t('Waiting for payment...')}
-                  </span>
+                  {t('Complete the payment in your wallet...')}
                 </div>
               </div>
             )}

@@ -13,9 +13,10 @@ authentication mechanisms and the use of LiveKit prefab components for the UI.
 - **Main Tech Stack**: React 18 + TypeScript + Vite, Tailwind CSS + Radix UI, Jotai, Nostr (nostr-tools).
 - **HiveRelay Endpoint**: `https://premrelay.exe.xyz`
 - **Authentication Mechanisms**:
-    - **Mechanism A (Action events)**: Used for `/api/auth/login`, `/api/subscribe`, `/api/payment/status`, `/api/subscription`, `/api/register-room`, `/api/room/edit`. Involves fetching a challenge/nonce, signing a kind-27235 Nostr event with specific tags (`payload`, `action`, `nonce`, `u`, `method`), base64 encoding the event, and sending with `Authorization` and `X-Challenge` headers.
+    - **Mechanism A (Action events)**: Used for `/api/auth/login`, `/api/subscribe`, `/api/subscription`, `/api/register-room`, `/api/room/edit`. Involves fetching a challenge/nonce, signing a kind-27235 Nostr event with specific tags (`payload`, `action`, `nonce`, `u`, `method`), base64 encoding the event, and sending with `Authorization` and `X-Challenge` headers.
     - **Mechanism B (Body-based signed event)**: Used *only* for `/api/get-token`. The signed kind-27235 event is sent in the request body as a raw JSON string (not base64), with `pubkey` and `attributes.signed_event` fields. No `action` or `nonce` tags, no `X-Challenge` header.
-- **Error Handling**: Specific handling for 402, 403, and 503 HTTP errors. On 402, an inline subscription offer should be shown.
+- **L402 Payment Flow**: `/api/subscribe` is now L402-compliant. The first POST returns `402 Payment Required` with `WWW-Authenticate: L402 macaroon="<base64>", invoice="<bolt11>"`. The client pays the BOLT11 invoice (via `lightningService.payInvoice`), obtains the 32-byte preimage, and retries the same signed action event with the L402 proof in the `X-L402` header: `X-L402: L402 <macaroon>:<preimage>`. The `Authorization` header remains the Nostr action event. No polling on `/api/payment/status` is needed.
+- **Error Handling**: Specific handling for 402, 403, and 503 HTTP errors. On 402, the user is prompted to pay the L402 invoice.
 - **LiveKit UI**: Use `@livekit/components-react` prefab components (`PreJoin`, `LiveKitRoom`, `VideoConference`). Customize `PreJoin` to use Nostr profile username and avatar.
 - **Nostr Signing**: Utilize existing client infrastructure (`window.nostr`, nos2x, or nsec login) for kind-27235 event signing.
 

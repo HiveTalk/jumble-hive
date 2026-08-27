@@ -1223,6 +1223,9 @@ export default {
     'Failed to load recordings': 'Failed to load recordings',
     Info: 'Info',
     'About this integration': 'About this integration',
-    'This jumble integration is demo white label version of hivetalk.org, for other moderation controls and features, please visit API docs, llms.txt at https://relay.hivetalk.org/': 'This jumble integration is demo white label version of hivetalk.org, for other moderation controls and features, please visit API docs, llms.txt at https://relay.hivetalk.org/'
+    'This jumble integration is demo white label version of hivetalk.org, for other moderation controls and features, please visit API docs, llms.txt at https://relay.hivetalk.org/': 'This jumble integration is demo white label version of hivetalk.org, for other moderation controls and features, please visit API docs, llms.txt at https://relay.hivetalk.org/',
+    'IMPORTANT NOTE:': 'IMPORTANT NOTE:',
+    'This jumble integration is demo white label version of hivetalk.org, for more information please visit API docs, llms.txt at': 'This jumble integration is demo white label version of hivetalk.org, for more information please visit API docs, llms.txt at',
+    'for the subscriptions page': 'for the subscriptions page'
   }
 }

@@ -65,7 +65,7 @@ type TAction =
  *    /api/subscribe, /api/payment/status, /api/subscription, /api/register-room
  *  - Mechanism B (body-based signed event): used by /api/get-token ONLY
  *
- * All endpoints on premrelay.exe.xyz serve CORS with allow-origin: *, so the
+ * All endpoints on the HiveRelay serve CORS with allow-origin: *, so the
  * browser calls the relay directly.
  */
 class HiveRelayService {

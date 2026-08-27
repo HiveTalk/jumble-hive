@@ -618,13 +618,17 @@ export const POMEGRANATE_OPERATOR_URLS = [
 // HiveRelay — Nostr relay (NIP-42/NIP-53) fronting LiveKit that mints access
 // tokens and owns the room registry. The relay serves CORS with
 // Access-Control-Allow-Origin: * on all endpoints, so browser clients call it
-// directly — no proxy needed. Override via VITE_HIVERELAY_API_BASE.
+// directly — no proxy needed. Override via VITE_HIVERELAY_API_BASE /
+// VITE_HIVERELAY_RELAY_URL (e.g. staging: https://l402relay.exe.xyz /
+// wss://l402relay.exe.xyz/).
 export const HIVERELAY_API_BASE =
   (import.meta.env.VITE_HIVERELAY_API_BASE as string | undefined) ??
-  'https://premrelay.exe.xyz'
+  'https://relay.hivetalk.org'
 
 // WebSocket URL for publishing kind-30312 room announcements.
-export const HIVERELAY_RELAY_URL = 'wss://premrelay.exe.xyz/'
+export const HIVERELAY_RELAY_URL =
+  (import.meta.env.VITE_HIVERELAY_RELAY_URL as string | undefined) ??
+  'wss://relay.hivetalk.org/'
 
 // Kind 27235 (NIP-98 HTTP auth) reused by HiveRelay for both standard NIP-98
 // and its "action event" challenge flow (extra action/nonce tags).

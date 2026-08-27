@@ -3,7 +3,7 @@
  *
  * HiveRelay is a Nostr relay (NIP-42/NIP-53) that fronts LiveKit, owns the room
  * registry, and mints LiveKit access tokens. These types mirror the REST API
- * at https://premrelay.exe.xyz (see /openapi.yaml).
+ * at the HiveRelay REST API (see /openapi.yaml on the relay host).
  */
 
 // ---- Auth / challenge -------------------------------------------------

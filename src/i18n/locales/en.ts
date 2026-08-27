@@ -1220,6 +1220,9 @@ export default {
     'Delete recording': 'Delete recording',
     'Recording deleted': 'Recording deleted',
     'Failed to delete recording': 'Failed to delete recording',
-    'Failed to load recordings': 'Failed to load recordings'
+    'Failed to load recordings': 'Failed to load recordings',
+    Info: 'Info',
+    'About this integration': 'About this integration',
+    'This jumble integration is demo white label version of hivetalk.org, for other moderation controls and features, please visit API docs, llms.txt at https://relay.hivetalk.org/': 'This jumble integration is demo white label version of hivetalk.org, for other moderation controls and features, please visit API docs, llms.txt at https://relay.hivetalk.org/'
   }
 }

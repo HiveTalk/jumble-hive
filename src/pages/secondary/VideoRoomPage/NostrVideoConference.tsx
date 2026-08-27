@@ -176,24 +176,24 @@ function NostrVideoConferenceInner({
             </div>
           )}
 
-          <div className="relative">
-            <ControlBar
-              variation="minimal"
-              controls={{
-                microphone: true,
-                camera: true,
-                screenShare: true,
-                chat: true,
-                leave: true
-              }}
-            />
+          <div className="flex items-stretch">
+            <div className="min-w-0 flex-1">
+              <ControlBar
+                variation="minimal"
+                controls={{
+                  microphone: true,
+                  camera: true,
+                  screenShare: true,
+                  chat: true,
+                  leave: true
+                }}
+              />
+            </div>
             <div
-              className="pointer-events-none absolute inset-y-0 end-3 flex items-center"
+              className="flex shrink-0 items-center border-t border-white/10 pe-3"
               style={{ paddingBlock: '0.75rem' }}
             >
-              <div className="pointer-events-auto">
-                <RoomToolsMenu roomName={roomName} token={token} />
-              </div>
+              <RoomToolsMenu roomName={roomName} token={token} />
             </div>
           </div>
         </div>

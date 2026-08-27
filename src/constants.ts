@@ -619,8 +619,8 @@ export const POMEGRANATE_OPERATOR_URLS = [
 // tokens and owns the room registry. The relay serves CORS with
 // Access-Control-Allow-Origin: * on all endpoints, so browser clients call it
 // directly — no proxy needed. Override via VITE_HIVERELAY_API_BASE /
-// VITE_HIVERELAY_RELAY_URL (e.g. staging: https://l402.exe.xyz /
-// wss://l402.exe.xyz/).
+// VITE_HIVERELAY_RELAY_URL (e.g. staging: https://l402relay.exe.xyz /
+// wss://l402relay.exe.xyz/).
 export const HIVERELAY_API_BASE =
   (import.meta.env.VITE_HIVERELAY_API_BASE as string | undefined) ??
   'https://relay.hivetalk.org'

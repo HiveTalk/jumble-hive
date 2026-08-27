@@ -12,7 +12,7 @@ const RELAYS = [
   'wss://relay.primal.net/',
   'wss://offchain.pub/',
   'wss://relay.ditto.pub/',
-  'wss://l402.exe.xyz/'
+  'wss://l402relay.exe.xyz/'
 ]
 
 // Existing key — convert hex to Uint8Array

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test'
 
 /**
  * E2E test: Jumble Nostr client connecting to the HiveRelay paid subscription
- * (l402.exe.xyz staging relay) and accessing the permanent room "room77".
+ * (l402relay.exe.xyz staging relay) and accessing the permanent room "room77".
  *
  * Flow:
  *  1. Load the Jumble dev client.

@@ -28,10 +28,9 @@ export default function RecordingsSection({
   const [entries, setEntries] = useState<TRecordingEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  // Accordion: collapsed by default so the section doesn't dominate the
-  // Video Rooms page for owners who have many recordings. The count badge in
-  // the header tells the user there's something to expand.
-  const [expanded, setExpanded] = useState(false)
+  // Accordion: open by default so recordings are visible without an extra
+  // click. The count badge in the header tells the user how many there are.
+  const [expanded, setExpanded] = useState(true)
   const seqRef = useRef(0)
 
   const refresh = useCallback(async () => {

@@ -5,6 +5,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 
 const LOCK_TOPIC = 'lk.roomlock'
 
+/** Minimum time between toggle calls — prevents spamming the relay API. */
+const TOGGLE_DEBOUNCE_MS = 500
+
 /** Parses the `lk.roomlock` data-channel broadcast hiverelay sends on lock/unlock. */
 function parseLockMessage(payload: Uint8Array, topic?: string): boolean | null {
   if (topic !== LOCK_TOPIC) return null
@@ -37,7 +40,14 @@ export function useRoomLock(roomName: string | undefined, token: string | undefi
   // Set as soon as the caller performs their own toggle, so a slow mount-time
   // hydration GET that resolves afterwards doesn't clobber a fresher local
   // (optimistic or server-confirmed) state with a stale snapshot.
+  //
+  // Reset to false at the end of each hydration cycle so that future
+  // hydrations (on roomName change or remount) are not permanently blocked
+  // by a toggle that happened during a previous hydration window.
   const hasLocalActionRef = useRef(false)
+
+  // Timestamp of the last toggle dispatch — used to debounce rapid calls.
+  const lastToggleAtRef = useRef(0)
 
   useEffect(() => {
     if (!roomName) return
@@ -49,6 +59,11 @@ export function useRoomLock(roomName: string | undefined, token: string | undefi
       })
       .catch(() => {
         // Fail silently — the data-channel broadcast is the live source of truth.
+      })
+      .finally(() => {
+        // Reset so a future hydration (roomName change, remount) is not
+        // permanently blocked by a toggle made during this window.
+        if (!cancelled) hasLocalActionRef.current = false
       })
     return () => {
       cancelled = true
@@ -68,12 +83,18 @@ export function useRoomLock(roomName: string | undefined, token: string | undefi
   }, [room])
 
   // Optimistic toggle with revert-on-failure, same shape as the recording hook.
+  // Debounced to prevent spamming the relay API with rapid back-to-back calls.
   const toggle = useCallback(async (): Promise<{ ok: boolean; error?: string }> => {
     if (!roomName || !token) {
       const message = 'Missing access token; please reload.'
       setError(message)
       return { ok: false, error: message }
     }
+    const now = Date.now()
+    if (now - lastToggleAtRef.current < TOGGLE_DEBOUNCE_MS) {
+      return { ok: false, error: 'Too many requests — please wait a moment.' }
+    }
+    lastToggleAtRef.current = now
     const next = !locked
     hasLocalActionRef.current = true
     setError(null)

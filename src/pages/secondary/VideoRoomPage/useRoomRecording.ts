@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 /** Grace period after a successful start during which a status poll reporting recording=false is ignored (egress registration lag). */
 const START_IDLE_GRACE_MS = 10_000
 
+/** Minimum time between start/stop calls — prevents spamming the relay API. */
+const ACTION_DEBOUNCE_MS = 500
+
 function parseTimestampSeconds(v: unknown): number | undefined {
   if (typeof v === 'number') return Number.isFinite(v) ? v : undefined
   if (typeof v === 'string') {
@@ -34,6 +37,8 @@ export function useRoomRecording(roomName: string | undefined, token: string | u
   const [now, setNow] = useState(Date.now())
 
   const ignoreIdleUntilRef = useRef(0)
+  // Timestamp of the last start/stop dispatch — used to debounce rapid calls.
+  const lastActionAtRef = useRef(0)
 
   const pollFast = status === 'stopping'
   useEffect(() => {
@@ -73,6 +78,11 @@ export function useRoomRecording(roomName: string | undefined, token: string | u
       setError(message)
       return { ok: false, error: message }
     }
+    const now = Date.now()
+    if (now - lastActionAtRef.current < ACTION_DEBOUNCE_MS) {
+      return { ok: false, error: 'Too many requests — please wait a moment.' }
+    }
+    lastActionAtRef.current = now
     setError(null)
     setPending(true)
     try {
@@ -100,6 +110,11 @@ export function useRoomRecording(roomName: string | undefined, token: string | u
       setError(message)
       return { ok: false, error: message }
     }
+    const now = Date.now()
+    if (now - lastActionAtRef.current < ACTION_DEBOUNCE_MS) {
+      return { ok: false, error: 'Too many requests — please wait a moment.' }
+    }
+    lastActionAtRef.current = now
     setError(null)
     setPending(true)
     try {

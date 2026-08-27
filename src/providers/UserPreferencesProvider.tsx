@@ -1,6 +1,8 @@
+import { videoRoomsActiveAtom } from '@/atoms/videoRoomsLayout'
 import client from '@/services/client.service'
 import storage from '@/services/local-storage.service'
 import { TEmoji, TFeedTabConfig, TNotificationStyle, TNotificationTabConfig } from '@/types'
+import { useAtomValue } from 'jotai'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { useScreenSize } from './ScreenSizeProvider'
 
@@ -45,6 +47,7 @@ export const useUserPreferences = () => {
 
 export function UserPreferencesProvider({ children }: { children: React.ReactNode }) {
   const { isSmallScreen } = useScreenSize()
+  const videoRoomsActive = useAtomValue(videoRoomsActiveAtom)
   const [notificationListStyle, setNotificationListStyle] = useState(
     storage.getNotificationListStyle()
   )
@@ -65,12 +68,12 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
   )
 
   useEffect(() => {
-    if (!isSmallScreen && enableSingleColumnLayout) {
+    if (!isSmallScreen && (enableSingleColumnLayout || videoRoomsActive)) {
       document.documentElement.style.setProperty('overflow-y', 'scroll')
     } else {
       document.documentElement.style.removeProperty('overflow-y')
     }
-  }, [enableSingleColumnLayout, isSmallScreen])
+  }, [enableSingleColumnLayout, isSmallScreen, videoRoomsActive])
 
   const updateNotificationListStyle = (style: TNotificationStyle) => {
     setNotificationListStyle(style)
@@ -122,7 +125,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         updateMuteMedia: setMuteMedia,
         sidebarCollapse,
         updateSidebarCollapse,
-        enableSingleColumnLayout: isSmallScreen ? true : enableSingleColumnLayout,
+        enableSingleColumnLayout:
+          isSmallScreen || videoRoomsActive ? true : enableSingleColumnLayout,
         updateEnableSingleColumnLayout,
         quickReaction,
         updateQuickReaction,

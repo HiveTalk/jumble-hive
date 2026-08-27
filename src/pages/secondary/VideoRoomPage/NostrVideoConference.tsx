@@ -14,6 +14,7 @@ import {
 import { Track } from 'livekit-client'
 import { useEffect, useRef, useState } from 'react'
 import { NostrParticipantTile } from './NostrParticipantTile'
+import { RoomToolsMenu } from './RoomToolsMenu'
 
 /**
  * A custom VideoConference component that uses NostrParticipantTile instead of
@@ -26,7 +27,15 @@ import { NostrParticipantTile } from './NostrParticipantTile'
  *
  * Must be rendered inside a <LiveKitRoom> (which provides RoomContext).
  */
-export function NostrVideoConference() {
+export function NostrVideoConference({
+  roomName,
+  token
+}: {
+  /** Exact room name used to join (for the recording/lock REST calls). */
+  roomName?: string
+  /** The LiveKit JWT used to join, reused as Bearer auth for owner actions. */
+  token?: string
+}) {
   const connectionState = useConnectionState()
 
   // Only render the conference once connected — the LayoutContextProvider
@@ -43,12 +52,18 @@ export function NostrVideoConference() {
 
   return (
     <LayoutContextProvider>
-      <NostrVideoConferenceInner />
+      <NostrVideoConferenceInner roomName={roomName} token={token} />
     </LayoutContextProvider>
   )
 }
 
-function NostrVideoConferenceInner() {
+function NostrVideoConferenceInner({
+  roomName,
+  token
+}: {
+  roomName?: string
+  token?: string
+}) {
   const [widgetState, setWidgetState] = useState<{
     showChat: boolean
     unreadMessages: number
@@ -151,16 +166,26 @@ function NostrVideoConferenceInner() {
             </div>
           )}
 
-          <ControlBar
-            variation="minimal"
-            controls={{
-              microphone: true,
-              camera: true,
-              screenShare: true,
-              chat: true,
-              leave: true
-            }}
-          />
+          <div className="relative">
+            <ControlBar
+              variation="minimal"
+              controls={{
+                microphone: true,
+                camera: true,
+                screenShare: true,
+                chat: true,
+                leave: true
+              }}
+            />
+            <div
+              className="pointer-events-none absolute inset-y-0 end-3 flex items-center"
+              style={{ paddingBlock: '0.75rem' }}
+            >
+              <div className="pointer-events-auto">
+                <RoomToolsMenu roomName={roomName} token={token} />
+              </div>
+            </div>
+          </div>
         </div>
 
         <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />

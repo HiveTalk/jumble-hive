@@ -8,10 +8,16 @@ import {
   THiveRelayGateError,
   THiveRelayGetTokenRequest,
   THiveRelayGetTokenResponse,
+  THiveRelayLockResponse,
   THiveRelayOwnedRoom,
   THiveRelayPaymentStatusResponse,
   THiveRelayPlanId,
   THiveRelayPlansResponse,
+  THiveRelayRecordingDownloadResponse,
+  THiveRelayRecordingListResponse,
+  THiveRelayRecordingStartResponse,
+  THiveRelayRecordingStatus,
+  THiveRelayRecordingStopResponse,
   THiveRelayRegisteredRoom,
   THiveRelayRoomDeleteResponse,
   THiveRelayRoomInfo,
@@ -633,6 +639,86 @@ class HiveRelayService {
   /** GET /api/list-rooms — live LiveKit rooms with metadata. Public. */
   async listRooms(): Promise<THiveRelayRoomSummary[]> {
     return this.request<THiveRelayRoomSummary[]>('GET', '/api/list-rooms')
+  }
+
+  // ---- Room lock ---------------------------------------------------------
+
+  /**
+   * POST /api/room/notify-lock {room_name, locked} — owner/moderator only.
+   * Uses the LiveKit JWT as Bearer auth, same mechanism as `deleteRoom`. New
+   * participants cannot join a locked room; existing participants stay
+   * connected. Broadcasts an `lk.roomlock` data message to the room so other
+   * clients can react live.
+   */
+  async setRoomLock(
+    token: string,
+    roomName: string,
+    locked: boolean
+  ): Promise<THiveRelayLockResponse> {
+    return this.request<THiveRelayLockResponse>('POST', '/api/room/notify-lock', {
+      body: { room_name: roomName, locked },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  // ---- Recording ----------------------------------------------------------
+
+  /** POST /api/room/recording/start {roomName} — owner-only. Bearer <LiveKit JWT>. */
+  async startRecording(token: string, roomName: string): Promise<THiveRelayRecordingStartResponse> {
+    return this.request<THiveRelayRecordingStartResponse>('POST', '/api/room/recording/start', {
+      body: { roomName },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /** POST /api/room/recording/stop {roomName} — owner-only. Bearer <LiveKit JWT>. */
+  async stopRecording(token: string, roomName: string): Promise<THiveRelayRecordingStopResponse> {
+    return this.request<THiveRelayRecordingStopResponse>('POST', '/api/room/recording/stop', {
+      body: { roomName },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /**
+   * GET /api/room/recording/status?roomName= — public pre-join read, no auth
+   * required. Used to poll the elapsed-time indicator while recording.
+   */
+  async getRecordingStatus(roomName: string): Promise<THiveRelayRecordingStatus> {
+    return this.request<THiveRelayRecordingStatus>('GET', '/api/room/recording/status', {
+      query: { roomName }
+    })
+  }
+
+  /** GET /api/room/recording/list?roomName= — owner-only. Bearer <LiveKit JWT>. */
+  async listRecordings(token: string, roomName: string): Promise<THiveRelayRecordingListResponse> {
+    return this.request<THiveRelayRecordingListResponse>('GET', '/api/room/recording/list', {
+      query: { roomName },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /**
+   * GET /api/room/recording/download?roomName=&id= — mints a fresh presigned
+   * download URL. Only needed when a list row's `download_url` is missing or
+   * has expired (`download_expires_at` in the past).
+   */
+  async getRecordingDownloadUrl(
+    token: string,
+    roomName: string,
+    id: string
+  ): Promise<THiveRelayRecordingDownloadResponse> {
+    return this.request<THiveRelayRecordingDownloadResponse>('GET', '/api/room/recording/download', {
+      query: { roomName, id },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /** DELETE /api/room/recording/delete?roomName=&id= — owner-only. Bearer <LiveKit JWT>. */
+  async deleteRecording(token: string, roomName: string, id: string): Promise<void> {
+    await this.request<void>('DELETE', '/api/room/recording/delete', {
+      query: { roomName, id },
+      auth: `Bearer ${token}`
+    })
   }
 }
 

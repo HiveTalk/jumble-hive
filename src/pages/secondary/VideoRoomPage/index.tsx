@@ -136,14 +136,14 @@ const VideoRoomPage = forwardRef(
       pop()
     }
 
-    const decodedRoomName = roomName ? decodeURIComponent(roomName) : t('Video Room')
+    const decodedRoomName = roomName ? decodeURIComponent(roomName) : undefined
     const npub = profile?.npub ?? ''
 
     return (
       <SecondaryPageLayout
         ref={ref}
         index={index}
-        title={decodedRoomName}
+        title={decodedRoomName ?? t('Video Room')}
         hideBackButton
         noScrollArea
         hideTitlebarBottomBorder
@@ -210,7 +210,7 @@ const VideoRoomPage = forwardRef(
             >
               <NostrProfileSync />
               <NostrProfilesSync>
-                <NostrVideoConference />
+                <NostrVideoConference roomName={decodedRoomName} token={token} />
               </NostrProfilesSync>
             </LiveKitRoom>
           )}

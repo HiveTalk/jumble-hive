@@ -1205,6 +1205,21 @@ export default {
     'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.': 'Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.',
     'Payment was not settled': 'Payment was not settled',
     'Complete the payment in your wallet...': 'Complete the payment in your wallet...',
-    'No plans available.': 'No plans available.'
+    'No plans available.': 'No plans available.',
+    'Room tools': 'Room tools',
+    'Lock room': 'Lock room',
+    'Unlock room': 'Unlock room',
+    'Failed to update room lock': 'Failed to update room lock',
+    Record: 'Record',
+    'Stop ({{time}})': 'Stop ({{time}})',
+    'Finalizing…': 'Finalizing…',
+    'Could not start recording': 'Could not start recording',
+    'Could not stop recording': 'Could not stop recording',
+    Recordings: 'Recordings',
+    'No recordings yet.': 'No recordings yet.',
+    'Delete recording': 'Delete recording',
+    'Recording deleted': 'Recording deleted',
+    'Failed to delete recording': 'Failed to delete recording',
+    'Failed to load recordings': 'Failed to load recordings'
   }
 }

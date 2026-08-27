@@ -27,6 +27,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import CreateRoomDialog from './CreateRoomDialog'
 import JoinRoomCard from './JoinRoomCard'
+import RecordingsSection from './RecordingsSection'
 import SubscribeDialog from './SubscribeDialog'
 
 const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
@@ -209,6 +210,8 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
                 </Button>
               )}
             </div>
+
+            <RecordingsSection pubkey={pubkey} ownedRooms={ownedRooms} />
 
             {/* Create + Join */}
             <div className="grid gap-4 sm:grid-cols-2">

@@ -126,7 +126,7 @@ export function RoomToolsMenu({ roomName, token }: { roomName?: string; token?: 
         aria-label={t('Room tools')}
         title={t('Room tools')}
         onClick={() => setOpen((v) => !v)}
-        className="lk-button"
+        className="lk-button bg-primary text-primary-foreground hover:bg-primary-hover"
       >
         <ChevronUp className={cn('size-5 transition-transform', open && 'rotate-180')} />
       </button>

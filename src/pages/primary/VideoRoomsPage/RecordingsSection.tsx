@@ -1,8 +1,9 @@
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import hiverelayService from '@/services/hiverelay.service'
 import { THiveRelayOwnedRoom, THiveRelayRecordingRow } from '@/types/hiverelay'
 import dayjs from 'dayjs'
-import { Download, Loader2, Trash2, Video } from 'lucide-react'
+import { ChevronDown, Download, Loader2, Trash2, Video } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -27,6 +28,10 @@ export default function RecordingsSection({
   const [entries, setEntries] = useState<TRecordingEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  // Accordion: collapsed by default so the section doesn't dominate the
+  // Video Rooms page for owners who have many recordings. The count badge in
+  // the header tells the user there's something to expand.
+  const [expanded, setExpanded] = useState(false)
   const seqRef = useRef(0)
 
   const refresh = useCallback(async () => {
@@ -99,58 +104,79 @@ export default function RecordingsSection({
 
   return (
     <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-semibold text-muted-foreground">{t('Recordings')}</h2>
-      {loading && entries.length === 0 ? (
-        <div className="flex items-center justify-center rounded-xl border border-dashed bg-background p-4">
-          <Loader2 className="size-4 animate-spin text-muted-foreground" />
-        </div>
-      ) : entries.length === 0 ? (
-        <div className="rounded-xl border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
-          {t('No recordings yet.')}
-        </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {entries.map((entry) => (
-            <div
-              key={entry.row.id}
-              className="flex items-center justify-between gap-2 rounded-xl border bg-background p-3"
-            >
-              <div className="flex min-w-0 items-center gap-2">
-                <Video className="size-4 shrink-0 text-muted-foreground" />
-                <div className="min-w-0">
-                  <div className="truncate font-medium" dir="auto">
-                    {entry.roomName}
-                  </div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {formatRecordingMeta(entry.row)}
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        className="flex items-center justify-between rounded-lg px-1 py-0.5 text-start transition-colors hover:bg-accent/40"
+      >
+        <span className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+          {t('Recordings')}
+          {entries.length > 0 && (
+            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+              {entries.length}
+            </span>
+          )}
+        </span>
+        <ChevronDown
+          className={cn(
+            'size-4 shrink-0 text-muted-foreground transition-transform',
+            expanded && 'rotate-180'
+          )}
+        />
+      </button>
+      {expanded &&
+        (loading && entries.length === 0 ? (
+          <div className="flex items-center justify-center rounded-xl border border-dashed bg-background p-4">
+            <Loader2 className="size-4 animate-spin text-muted-foreground" />
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="rounded-xl border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
+            {t('No recordings yet.')}
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {entries.map((entry) => (
+              <div
+                key={entry.row.id}
+                className="flex items-center justify-between gap-2 rounded-xl border bg-background p-3"
+              >
+                <div className="flex min-w-0 items-center gap-2">
+                  <Video className="size-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0">
+                    <div className="truncate font-medium" dir="auto">
+                      {entry.roomName}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {formatRecordingMeta(entry.row)}
+                    </div>
                   </div>
                 </div>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button variant="ghost" size="icon" asChild title={t('Download')}>
+                    <a href={entry.row.download_url} target="_blank" rel="noopener noreferrer">
+                      <Download className="size-4" />
+                    </a>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-destructive"
+                    title={t('Delete recording')}
+                    disabled={deletingId === entry.row.id}
+                    onClick={() => handleDelete(entry)}
+                  >
+                    {deletingId === entry.row.id ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="size-4" />
+                    )}
+                  </Button>
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
-                <Button variant="ghost" size="icon" asChild title={t('Download')}>
-                  <a href={entry.row.download_url} target="_blank" rel="noopener noreferrer">
-                    <Download className="size-4" />
-                  </a>
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="text-muted-foreground hover:text-destructive"
-                  title={t('Delete recording')}
-                  disabled={deletingId === entry.row.id}
-                  onClick={() => handleDelete(entry)}
-                >
-                  {deletingId === entry.row.id ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Trash2 className="size-4" />
-                  )}
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+            ))}
+          </div>
+        ))}
     </section>
   )
 }

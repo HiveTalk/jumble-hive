@@ -110,7 +110,7 @@ export default function RecordingsSection({
         aria-expanded={expanded}
         className="flex items-center justify-between rounded-lg px-1 py-0.5 text-start transition-colors hover:bg-accent/40"
       >
-        <span className="flex items-center gap-2 text-sm font-semibold text-muted-foreground">
+        <span className="flex items-center gap-2 text-base font-bold text-foreground">
           {t('Recordings')}
           {entries.length > 0 && (
             <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">

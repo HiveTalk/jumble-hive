@@ -3,7 +3,7 @@
  *
  * HiveRelay is a Nostr relay (NIP-42/NIP-53) that fronts LiveKit, owns the room
  * registry, and mints LiveKit access tokens. These types mirror the REST API
- * at https://premrelay.exe.xyz (see /openapi.yaml).
+ * at the HiveRelay REST API (see /openapi.yaml on the relay host).
  */
 
 // ---- Auth / challenge -------------------------------------------------
@@ -90,6 +90,8 @@ export interface THiveRelayRoomInfo {
   owner_pubkey: string
   is_private: boolean
   aliases?: string[]
+  locked?: boolean
+  lobby_enabled?: boolean
 }
 
 export interface THiveRelayRoomSummary {
@@ -103,6 +105,73 @@ export interface THiveRelayRoomDeleteResponse {
   room_name: string
   livekit_deleted: boolean
   events_removed: number
+}
+
+// ---- Room lock ----------------------------------------------------------
+
+export interface THiveRelayLockResponse {
+  room_name: string
+  locked: boolean
+  lobby_enabled?: boolean
+}
+
+// ---- Recording ----------------------------------------------------------
+
+export interface THiveRelayRecordingStartResponse {
+  recording_id: string
+  room_name: string
+  status: string
+  egress_id: string
+  started_at?: string
+  object_key?: string
+  expires_at?: string
+  reserved_at?: number
+}
+
+export interface THiveRelayRecordingStopResponse {
+  recording_id: string
+  room_name: string
+  status: string
+  egress_id: string
+  stop_requested_at?: string | number
+}
+
+export interface THiveRelayRecordingStatus {
+  room_name: string
+  recording: boolean
+  status?: string
+  started_at?: number | string
+  reserved_at?: number
+  egress_id?: string
+}
+
+export interface THiveRelayRecordingRow {
+  id: string
+  room_name: string
+  status: string
+  egress_id?: string
+  object_key?: string
+  file_size_bytes?: number
+  duration_seconds?: number
+  started_at?: string
+  stopped_at?: string
+  expires_at?: string
+  error?: string
+  download_url?: string
+  download_expires_at?: string
+}
+
+export interface THiveRelayRecordingListResponse {
+  room_name: string
+  recordings: THiveRelayRecordingRow[]
+}
+
+export interface THiveRelayRecordingDownloadResponse {
+  recording_id: string
+  room_name: string
+  status: string
+  download_url: string
+  download_expires_at?: string
 }
 
 // ---- get-token --------------------------------------------------------

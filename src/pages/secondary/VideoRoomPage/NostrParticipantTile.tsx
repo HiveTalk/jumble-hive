@@ -66,7 +66,20 @@ function NostrParticipantTileImpl({
         !subscribed &&
         layoutContext?.pin.dispatch
       ) {
-        layoutContext.pin.dispatch({ msg: 'clear_pin' })
+        // Only clear the pin if THIS track is the one currently focused.
+        // Otherwise we'd clear a manual pin on a different participant's tile.
+        // Use identity (string) comparison instead of reference equality —
+        // participant object references are usually stable within a session,
+        // but identity comparison is robust against LiveKit re-creating
+        // participant objects on reconnect.
+        const focusedTrack = layoutContext.pin.state?.[0]
+        if (
+          focusedTrack &&
+          focusedTrack.participant?.identity === resolvedTrackRef.participant?.identity &&
+          focusedTrack.source === resolvedTrackRef.source
+        ) {
+          layoutContext.pin.dispatch({ msg: 'clear_pin' })
+        }
       }
     },
     [resolvedTrackRef, layoutContext]

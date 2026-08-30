@@ -7,13 +7,14 @@ import {
   LayoutContextProvider,
   RoomAudioRenderer,
   useConnectionState,
-  useLayoutContext,
+  useCreateLayoutContext,
   useTracks,
   type TrackReferenceOrPlaceholder
 } from '@livekit/components-react'
 import { Track } from 'livekit-client'
 import { useEffect, useRef, useState } from 'react'
 import { NostrParticipantTile } from './NostrParticipantTile'
+import { RoomToolsMenu } from './RoomToolsMenu'
 
 /**
  * A custom VideoConference component that uses NostrParticipantTile instead of
@@ -26,7 +27,15 @@ import { NostrParticipantTile } from './NostrParticipantTile'
  *
  * Must be rendered inside a <LiveKitRoom> (which provides RoomContext).
  */
-export function NostrVideoConference() {
+export function NostrVideoConference({
+  roomName,
+  token
+}: {
+  /** Exact room name used to join (for the recording/lock REST calls). */
+  roomName?: string
+  /** The LiveKit JWT used to join, reused as Bearer auth for owner actions. */
+  token?: string
+}) {
   const connectionState = useConnectionState()
 
   // Only render the conference once connected — the LayoutContextProvider
@@ -41,14 +50,16 @@ export function NostrVideoConference() {
     )
   }
 
-  return (
-    <LayoutContextProvider>
-      <NostrVideoConferenceInner />
-    </LayoutContextProvider>
-  )
+  return <NostrVideoConferenceInner roomName={roomName} token={token} />
 }
 
-function NostrVideoConferenceInner() {
+function NostrVideoConferenceInner({
+  roomName,
+  token
+}: {
+  roomName?: string
+  token?: string
+}) {
   const [widgetState, setWidgetState] = useState<{
     showChat: boolean
     unreadMessages: number
@@ -60,7 +71,11 @@ function NostrVideoConferenceInner() {
   })
 
   const pinnedTrackRef = useRef<TrackReferenceOrPlaceholder | null>(null)
-  const layoutContext = useLayoutContext()
+  // Single layout context — shared between the focus/layout logic and the
+  // FocusToggle buttons inside participant tiles. Using useCreateLayoutContext
+  // here (instead of nesting two LayoutContextProviders) ensures that pin
+  // dispatches from FocusToggle reach the same state that controls the layout.
+  const layoutContext = useCreateLayoutContext()
 
   // Camera tracks (with placeholder for muted cameras) + screen share tracks
   const tracks = useTracks(
@@ -86,22 +101,31 @@ function NostrVideoConferenceInner() {
     const hasActiveScreenShare = screenShareTracks.some(
       (t) => t.publication?.isSubscribed
     )
+    const autoPinnedTrack = pinnedTrackRef.current
+    const currentFocus = layoutContext?.pin.state?.[0]
 
-    if (hasActiveScreenShare && pinnedTrackRef.current === null) {
-      const screenTrack = screenShareTracks[0]
-      layoutContext?.pin.dispatch?.({
-        msg: 'set_pin',
-        trackReference: screenTrack
-      })
-      pinnedTrackRef.current = screenTrack
+    if (hasActiveScreenShare && autoPinnedTrack === null) {
+      // Only auto-pin if there's no current focus (user hasn't manually pinned)
+      if (!currentFocus) {
+        const screenTrack = screenShareTracks[0]
+        layoutContext?.pin.dispatch?.({
+          msg: 'set_pin',
+          trackReference: screenTrack
+        })
+        pinnedTrackRef.current = screenTrack
+      }
     } else if (
-      pinnedTrackRef.current &&
+      autoPinnedTrack &&
       !screenShareTracks.some(
         (t) =>
-          t.publication?.trackSid === pinnedTrackRef.current?.publication?.trackSid
+          t.publication?.trackSid === autoPinnedTrack.publication?.trackSid
       )
     ) {
-      layoutContext?.pin.dispatch?.({ msg: 'clear_pin' })
+      // The auto-pinned screen share track is gone.
+      // Only clear if the user hasn't manually focused something else.
+      if (currentFocus === autoPinnedTrack) {
+        layoutContext?.pin.dispatch?.({ msg: 'clear_pin' })
+      }
       pinnedTrackRef.current = null
     }
   }, [
@@ -127,6 +151,7 @@ function NostrVideoConferenceInner() {
       style={{ ['--lk-control-bar-height' as string]: '52px' }}
     >
       <LayoutContextProvider
+        value={layoutContext}
         onWidgetChange={onWidgetChange}
       >
         <div className="lk-video-conference-inner">
@@ -151,16 +176,26 @@ function NostrVideoConferenceInner() {
             </div>
           )}
 
-          <ControlBar
-            variation="minimal"
-            controls={{
-              microphone: true,
-              camera: true,
-              screenShare: true,
-              chat: true,
-              leave: true
-            }}
-          />
+          <div className="flex items-stretch">
+            <div className="min-w-0 flex-1">
+              <ControlBar
+                variation="minimal"
+                controls={{
+                  microphone: true,
+                  camera: true,
+                  screenShare: true,
+                  chat: true,
+                  leave: true
+                }}
+              />
+            </div>
+            <div
+              className="flex shrink-0 items-center border-t border-white/10 pe-3"
+              style={{ paddingBlock: '0.75rem' }}
+            >
+              <RoomToolsMenu roomName={roomName} token={token} />
+            </div>
+          </div>
         </div>
 
         <Chat style={{ display: widgetState.showChat ? 'grid' : 'none' }} />

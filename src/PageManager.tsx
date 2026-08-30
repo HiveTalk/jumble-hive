@@ -2,6 +2,8 @@ import Sidebar from '@/components/Sidebar'
 import { cn } from '@/lib/utils'
 import { CurrentRelaysProvider } from '@/providers/CurrentRelaysProvider'
 import { TPageRef } from '@/types'
+import { videoRoomsActiveAtom } from '@/atoms/videoRoomsLayout'
+import { useSetAtom } from 'jotai'
 import {
   cloneElement,
   createContext,
@@ -10,6 +12,7 @@ import {
   RefObject,
   useContext,
   useEffect,
+  useMemo,
   useRef,
   useState
 } from 'react'
@@ -84,6 +87,23 @@ export function PageManager({ maxStackSize = 5 }: { maxStackSize?: number }) {
   const { themeSetting } = useTheme()
   const { enableSingleColumnLayout, sidebarCollapse } = useUserPreferences()
   const ignorePopStateRef = useRef(false)
+
+  // True while the "videoRooms" primary page (no secondary page pushed) or a
+  // /video-rooms/:roomName secondary page is on top. Video tiles need every
+  // pixel of width, so this both forces the single, full-width column (via
+  // videoRoomsActiveAtom -> UserPreferencesProvider) and force-collapses the
+  // sidebar below, without touching the user's actual layout preferences.
+  const isVideoRoomsActive = useMemo(() => {
+    if (secondaryStack.length > 0) {
+      return secondaryStack[secondaryStack.length - 1].url.startsWith('/video-rooms/')
+    }
+    return currentPrimaryPage === 'videoRooms'
+  }, [currentPrimaryPage, secondaryStack])
+
+  const setVideoRoomsActive = useSetAtom(videoRoomsActiveAtom)
+  useEffect(() => {
+    setVideoRoomsActive(isVideoRoomsActive)
+  }, [isVideoRoomsActive, setVideoRoomsActive])
 
   useEffect(() => {
     if (isSmallScreen) return
@@ -354,9 +374,22 @@ export function PageManager({ maxStackSize = 5 }: { maxStackSize?: number }) {
         >
           <CurrentRelaysProvider>
             <NotificationProvider>
-              <div className="flex w-full wide:justify-around">
-                <div className={cn('wide:w-full', sidebarCollapse ? 'w-16' : 'w-52')} />
-                <div className="min-h-screen w-0 flex-1 border-x bg-background wide:w-[640px] wide:flex-auto wide:shrink-0">
+              <div className={cn('flex w-full', !isVideoRoomsActive && 'wide:justify-around')}>
+                <div
+                  className={cn(
+                    isVideoRoomsActive
+                      ? 'w-16'
+                      : cn('wide:w-full', sidebarCollapse ? 'w-16' : 'w-52')
+                  )}
+                />
+                <div
+                  className={cn(
+                    'min-h-screen w-0 flex-1 bg-background',
+                    isVideoRoomsActive
+                      ? 'border-s'
+                      : 'border-x wide:w-[640px] wide:flex-auto wide:shrink-0'
+                  )}
+                >
                   {!!secondaryStack.length &&
                     secondaryStack.map((item, index) => (
                       <div
@@ -382,16 +415,18 @@ export function PageManager({ maxStackSize = 5 }: { maxStackSize?: number }) {
                     </div>
                   ))}
                 </div>
-                <div className="hidden wide:block wide:w-full" />
+                {!isVideoRoomsActive && <div className="hidden wide:block wide:w-full" />}
               </div>
               <div
                 className={cn(
-                  'pointer-events-none fixed start-0 top-0 z-10 flex h-(--vh) justify-end wide:w-[calc((100%-640px)/2)]',
-                  sidebarCollapse ? 'w-16' : 'w-52'
+                  'pointer-events-none fixed start-0 top-0 z-10 flex h-(--vh) justify-end',
+                  isVideoRoomsActive
+                    ? 'w-16'
+                    : cn('wide:w-[calc((100%-640px)/2)]', sidebarCollapse ? 'w-16' : 'w-52')
                 )}
               >
                 <div className="pointer-events-auto">
-                  <Sidebar />
+                  <Sidebar forceCollapse={isVideoRoomsActive} />
                 </div>
               </div>
               <TooManyRelaysAlertDialog />

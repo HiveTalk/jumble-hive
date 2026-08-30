@@ -8,11 +8,16 @@ import {
   THiveRelayGateError,
   THiveRelayGetTokenRequest,
   THiveRelayGetTokenResponse,
-  THiveRelayInvoice,
+  THiveRelayLockResponse,
   THiveRelayOwnedRoom,
   THiveRelayPaymentStatusResponse,
   THiveRelayPlanId,
   THiveRelayPlansResponse,
+  THiveRelayRecordingDownloadResponse,
+  THiveRelayRecordingListResponse,
+  THiveRelayRecordingStartResponse,
+  THiveRelayRecordingStatus,
+  THiveRelayRecordingStopResponse,
   THiveRelayRegisteredRoom,
   THiveRelayRoomDeleteResponse,
   THiveRelayRoomInfo,
@@ -24,6 +29,28 @@ import { sha256 } from '@noble/hashes/sha2'
 import { bytesToHex } from '@noble/hashes/utils'
 import dayjs from 'dayjs'
 import { Event } from 'nostr-tools'
+import lightningService from '@/services/lightning.service'
+
+type TL402Proof = { macaroon: string; preimage: string }
+
+type TSubscribeResponse = {
+  res: Response
+  text: string
+  body?: THiveRelayPaymentStatusResponse & { error?: string }
+}
+
+const L402_PROOF_STORAGE_PREFIX = 'hiverelay.l402.proof.'
+
+/**
+ * States the relay will never move away from. A proof for an intent in one of
+ * these is worthless: replaying it can only fail, so it must be dropped or the
+ * user is locked out of buying a fresh invoice.
+ */
+type TTerminalPaymentStatus = 'expired' | 'failed'
+const TERMINAL_PAYMENT_STATUSES: TTerminalPaymentStatus[] = ['expired', 'failed']
+
+const isTerminalPaymentStatus = (status: string): status is TTerminalPaymentStatus =>
+  (TERMINAL_PAYMENT_STATUSES as string[]).includes(status)
 
 type TAction =
   | 'subscribe'
@@ -44,7 +71,7 @@ type TAction =
  *    /api/subscribe, /api/payment/status, /api/subscription, /api/register-room
  *  - Mechanism B (body-based signed event): used by /api/get-token ONLY
  *
- * All endpoints on premrelay.exe.xyz serve CORS with allow-origin: *, so the
+ * All endpoints on the HiveRelay serve CORS with allow-origin: *, so the
  * browser calls the relay directly.
  */
 class HiveRelayService {
@@ -69,6 +96,76 @@ class HiveRelayService {
 
   async getPublicKey(): Promise<string> {
     return this.signer.getPublicKey()
+  }
+
+  // ---- L402 helpers ----------------------------------------------------
+
+  private parseL402Header(header: string | null): { macaroon: string; invoice: string } | null {
+    const prefix = 'L402 '
+    if (!header || !header.startsWith(prefix)) return null
+    const rest = header.slice(prefix.length)
+    const macaroonMatch = /macaroon="([^"]+)"/.exec(rest)
+    const invoiceMatch = /invoice="([^"]+)"/.exec(rest)
+    if (!macaroonMatch || !invoiceMatch) return null
+    return { macaroon: macaroonMatch[1], invoice: invoiceMatch[1] }
+  }
+
+  /**
+   * The challenge also travels in the 402 body, which is the only copy a
+   * cross-origin caller can rely on: `WWW-Authenticate` is not a CORS-safelisted
+   * response header, so it is invisible unless the relay lists it in
+   * `Access-Control-Expose-Headers`.
+   */
+  private parseL402Body(body: unknown): { macaroon: string; invoice: string } | null {
+    if (!body || typeof body !== 'object') return null
+    const record = body as Record<string, unknown>
+    const macaroon = record.macaroon
+    const invoice = record.invoice ?? record.bolt11
+    if (typeof macaroon !== 'string' || typeof invoice !== 'string') return null
+    if (!macaroon || !invoice) return null
+    return { macaroon, invoice }
+  }
+
+  private l402AuthHeader(macaroon: string, preimage: string): string {
+    return `L402 ${macaroon}:${preimage}`
+  }
+
+  private l402ProofKey(pubkey: string, plan: THiveRelayPlanId): string {
+    return `${L402_PROOF_STORAGE_PREFIX}${pubkey}:${plan}`
+  }
+
+  /**
+   * Proofs of a *paid but unredeemed* invoice. They outlive the page so a
+   * failed or interrupted redeem can be replayed instead of paying again, and
+   * are dropped as soon as the relay reports a state it will not move away
+   * from — settled, expired or failed. See `settleSubscribe`.
+   */
+  private readL402Proof(pubkey: string, plan: THiveRelayPlanId): TL402Proof | null {
+    try {
+      const raw = window.localStorage.getItem(this.l402ProofKey(pubkey, plan))
+      const proof = raw ? this.parseJson<TL402Proof>(raw) : undefined
+      if (!proof?.macaroon || !proof?.preimage) return null
+      return proof
+    } catch {
+      return null
+    }
+  }
+
+  private saveL402Proof(pubkey: string, plan: THiveRelayPlanId, proof: TL402Proof): void {
+    try {
+      window.localStorage.setItem(this.l402ProofKey(pubkey, plan), JSON.stringify(proof))
+    } catch {
+      // Storage unavailable (private mode, quota): the in-flight redeem below
+      // is then the only attempt we get.
+    }
+  }
+
+  private clearL402Proof(pubkey: string, plan: THiveRelayPlanId): void {
+    try {
+      window.localStorage.removeItem(this.l402ProofKey(pubkey, plan))
+    } catch {
+      // ignore
+    }
   }
 
   // ---- Signing helpers -------------------------------------------------
@@ -133,6 +230,16 @@ class HiveRelayService {
       Object.entries(query).forEach(([k, v]) => url.searchParams.set(k, v))
     }
     return url.toString()
+  }
+
+  /** JSON.parse that yields undefined instead of throwing on a non-JSON body. */
+  private parseJson<T>(text: string): T | undefined {
+    if (!text) return undefined
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      return undefined
+    }
   }
 
   private parseGate(body: string): THiveRelayGateError | undefined {
@@ -231,14 +338,144 @@ class HiveRelayService {
   }
 
   /**
-   * POST /api/subscribe {plan} with action="subscribe". Returns a BOLT11
-   * invoice bound to the caller's pubkey and plan. At most one pending invoice
-   * per pubkey; asking again returns the same one (409 pending_invoice).
+   * One signed POST /api/subscribe attempt, optionally carrying an L402 proof.
+   * Each attempt needs its own challenge because nonces are single-use.
    */
-  async subscribe(plan: THiveRelayPlanId): Promise<THiveRelayInvoice> {
-    return this.actionRequest<THiveRelayInvoice>('POST', '/api/subscribe', 'subscribe', {
-      body: { plan }
-    })
+  private async postSubscribe(
+    url: string,
+    rawBody: string,
+    proof?: TL402Proof
+  ): Promise<TSubscribeResponse> {
+    const { nonce, challenge } = await this.getChallenge()
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Authorization: await this.signActionEvent(url, 'POST', rawBody, 'subscribe', nonce),
+      'X-Challenge': challenge
+    }
+    if (proof) headers['X-L402'] = this.l402AuthHeader(proof.macaroon, proof.preimage)
+
+    let res: Response
+    try {
+      res = await fetch(url, { method: 'POST', headers, body: rawBody })
+    } catch (e) {
+      const detail = e instanceof Error && e.message ? e.message : 'Network error'
+      throw new HiveRelayError(`Could not reach HiveRelay: ${detail}`, 0)
+    }
+    const text = await res.text()
+    return {
+      res,
+      text,
+      body: this.parseJson<THiveRelayPaymentStatusResponse & { error?: string }>(text)
+    }
+  }
+
+  /**
+   * POST /api/subscribe {plan} with action="subscribe". The relay now returns
+   * an L402 402 challenge. We pay the invoice, obtain the preimage, and retry
+   * the signed action event with the L402 proof in the X-L402 header (the
+   * standard Authorization header is already used for the Nostr action event).
+   * The proof survives a failed redeem so it can be replayed, and a `pending`
+   * response is polled to settlement — a paid invoice is never thrown away.
+   */
+  async subscribe(plan: THiveRelayPlanId): Promise<THiveRelayPaymentStatusResponse> {
+    const url = this.buildUrl('/api/subscribe')
+    const rawBody = JSON.stringify({ plan })
+    const pubkey = await this.getPublicKey()
+
+    // A proof is only stored when its invoice was paid but the redeeming
+    // request never confirmed a subscription. Replay it before asking for a
+    // new challenge so an interrupted retry cannot cost a second invoice.
+    const stored = this.readL402Proof(pubkey, plan)
+    if (stored) {
+      const replay = await this.postSubscribe(url, rawBody, stored)
+      if (replay.res.ok && replay.body) {
+        return this.settleSubscribe(pubkey, plan, replay.body)
+      }
+      // The relay would not honour it (expired, already spent, malformed):
+      // drop it and buy a fresh invoice below.
+      this.clearL402Proof(pubkey, plan)
+    }
+
+    const { res, text, body } = await this.postSubscribe(url, rawBody)
+
+    if (res.status === 402) {
+      const l402 =
+        this.parseL402Header(res.headers.get('WWW-Authenticate')) ?? this.parseL402Body(body)
+      if (!l402) {
+        throw new HiveRelayError(
+          'HiveRelay asked for payment but sent no L402 invoice we could read',
+          402
+        )
+      }
+      const paid = await lightningService.payInvoice(l402.invoice)
+      if (!paid?.preimage) {
+        throw new HiveRelayError('Payment cancelled', 402)
+      }
+      // Persist before redeeming: from here on the sats are spent, and the
+      // macaroon + preimage are the only way to claim what they bought.
+      const proof = { macaroon: l402.macaroon, preimage: paid.preimage }
+      this.saveL402Proof(pubkey, plan, proof)
+
+      const retry = await this.postSubscribe(url, rawBody, proof)
+      if (!retry.res.ok || !retry.body) {
+        const gate = this.parseGate(retry.text)
+        const detail =
+          (gate?.error ?? retry.body?.error ?? retry.text.trim()) || retry.res.statusText
+        throw new HiveRelayError(
+          `Payment sent but HiveRelay did not confirm the subscription: ${detail}. The payment proof is saved — subscribing again redeems it instead of paying a second invoice.`,
+          retry.res.status,
+          gate
+        )
+      }
+      return this.settleSubscribe(pubkey, plan, retry.body)
+    }
+
+    if (!res.ok) {
+      const gate = this.parseGate(text)
+      const message = (gate?.error ?? body?.error ?? text.trim()) || res.statusText
+      throw new HiveRelayError(message, res.status, gate)
+    }
+    if (!body) {
+      throw new HiveRelayError('HiveRelay returned an unreadable payment response', res.status)
+    }
+    return body
+  }
+
+  /**
+   * Resolves a redeemed L402 payment to its final state: the relay may answer
+   * `pending` while it reconciles settlement, so poll it out rather than report
+   * failure for an invoice that is already paid.
+   *
+   * The proof is discarded on any state the relay will not move away from —
+   * `settled` (it did its job) as well as `expired`/`failed` (it never will).
+   * Keeping a dead proof would make every later subscribe replay it forever
+   * instead of buying a new invoice. It is kept only when the outcome is
+   * genuinely unknown (polling timeout, network error), which is the case this
+   * storage exists for.
+   */
+  private async settleSubscribe(
+    pubkey: string,
+    plan: THiveRelayPlanId,
+    body: THiveRelayPaymentStatusResponse
+  ): Promise<THiveRelayPaymentStatusResponse> {
+    let result = body
+    if (result.status === 'pending' && result.intent_id) {
+      try {
+        result = await this.pollPaymentUntilSettled(result.intent_id, {
+          intervalMs: 3000,
+          timeoutMs: 10 * 60 * 1000
+        })
+      } catch (e) {
+        if (e instanceof HiveRelayError && e.paymentStatus) {
+          this.clearL402Proof(pubkey, plan)
+        }
+        throw e
+      }
+    }
+    if (result.status === 'settled' || isTerminalPaymentStatus(result.status)) {
+      this.clearL402Proof(pubkey, plan)
+    }
+    return result
   }
 
   /**
@@ -278,8 +515,8 @@ class HiveRelayService {
       last = await this.getPaymentStatus(intentId)
       opts.onPoll?.(last)
       if (last.status === 'settled') return last
-      if (last.status === 'expired' || last.status === 'failed') {
-        throw new HiveRelayError(`Payment ${last.status}`, 402)
+      if (isTerminalPaymentStatus(last.status)) {
+        throw new HiveRelayError(`Payment ${last.status}`, 402, undefined, last.status)
       }
       await new Promise((r) => setTimeout(r, intervalMs))
     }
@@ -403,17 +640,109 @@ class HiveRelayService {
   async listRooms(): Promise<THiveRelayRoomSummary[]> {
     return this.request<THiveRelayRoomSummary[]>('GET', '/api/list-rooms')
   }
+
+  // ---- Room lock ---------------------------------------------------------
+
+  /**
+   * POST /api/room/notify-lock {room_name, locked} — owner/moderator only.
+   * Uses the LiveKit JWT as Bearer auth, same mechanism as `deleteRoom`. New
+   * participants cannot join a locked room; existing participants stay
+   * connected. Broadcasts an `lk.roomlock` data message to the room so other
+   * clients can react live.
+   */
+  async setRoomLock(
+    token: string,
+    roomName: string,
+    locked: boolean
+  ): Promise<THiveRelayLockResponse> {
+    return this.request<THiveRelayLockResponse>('POST', '/api/room/notify-lock', {
+      body: { room_name: roomName, locked },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  // ---- Recording ----------------------------------------------------------
+
+  /** POST /api/room/recording/start {roomName} — owner-only. Bearer <LiveKit JWT>. */
+  async startRecording(token: string, roomName: string): Promise<THiveRelayRecordingStartResponse> {
+    return this.request<THiveRelayRecordingStartResponse>('POST', '/api/room/recording/start', {
+      body: { roomName },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /** POST /api/room/recording/stop {roomName} — owner-only. Bearer <LiveKit JWT>. */
+  async stopRecording(token: string, roomName: string): Promise<THiveRelayRecordingStopResponse> {
+    return this.request<THiveRelayRecordingStopResponse>('POST', '/api/room/recording/stop', {
+      body: { roomName },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /**
+   * GET /api/room/recording/status?roomName= — public pre-join read, no auth
+   * required. Used to poll the elapsed-time indicator while recording.
+   */
+  async getRecordingStatus(roomName: string): Promise<THiveRelayRecordingStatus> {
+    return this.request<THiveRelayRecordingStatus>('GET', '/api/room/recording/status', {
+      query: { roomName }
+    })
+  }
+
+  /** GET /api/room/recording/list?roomName= — owner-only. Bearer <LiveKit JWT>. */
+  async listRecordings(token: string, roomName: string): Promise<THiveRelayRecordingListResponse> {
+    return this.request<THiveRelayRecordingListResponse>('GET', '/api/room/recording/list', {
+      query: { roomName },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /**
+   * GET /api/room/recording/download?roomName=&id= — mints a fresh presigned
+   * download URL. Only needed when a list row's `download_url` is missing or
+   * has expired (`download_expires_at` in the past).
+   */
+  async getRecordingDownloadUrl(
+    token: string,
+    roomName: string,
+    id: string
+  ): Promise<THiveRelayRecordingDownloadResponse> {
+    return this.request<THiveRelayRecordingDownloadResponse>('GET', '/api/room/recording/download', {
+      query: { roomName, id },
+      auth: `Bearer ${token}`
+    })
+  }
+
+  /** DELETE /api/room/recording/delete?roomName=&id= — owner-only. Bearer <LiveKit JWT>. */
+  async deleteRecording(token: string, roomName: string, id: string): Promise<void> {
+    await this.request<void>('DELETE', '/api/room/recording/delete', {
+      query: { roomName, id },
+      auth: `Bearer ${token}`
+    })
+  }
 }
 
 export class HiveRelayError extends Error {
   status: number
   gate?: THiveRelayGateError
+  /**
+   * Set when the relay reported a *terminal* payment state (`expired`/`failed`)
+   * rather than an inconclusive one (timeout, network). Callers use it to
+   * decide whether a stored L402 proof is dead and safe to discard.
+   */
+  paymentStatus?: TTerminalPaymentStatus
 
-  constructor(message: string, status: number, gate?: THiveRelayGateError) {
+  constructor(
+    message: string,
+    status: number,
+    gate?: THiveRelayGateError,
+    paymentStatus?: TTerminalPaymentStatus
+  ) {
     super(message)
     this.name = 'HiveRelayError'
     this.status = status
     this.gate = gate
+    this.paymentStatus = paymentStatus
   }
 }
 

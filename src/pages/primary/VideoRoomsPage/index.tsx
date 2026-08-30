@@ -21,12 +21,13 @@ import {
   THiveRelayRoomSummary,
   THiveRelaySubscription
 } from '@/types/hiverelay'
-import { CheckCircle2, Circle, Loader2, Plus, RefreshCw, Trash2, Users, Video, Zap } from 'lucide-react'
+import { CheckCircle2, Circle, Info, Loader2, Plus, RefreshCw, Trash2, Users, Video, Zap } from 'lucide-react'
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import CreateRoomDialog from './CreateRoomDialog'
 import JoinRoomCard from './JoinRoomCard'
+import RecordingsSection from './RecordingsSection'
 import SubscribeDialog from './SubscribeDialog'
 
 const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
@@ -158,6 +159,37 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
       }
     >
       <div className="flex flex-col gap-4 p-4">
+        {/* Info banner */}
+        <div className="flex items-start gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 ring-1 ring-amber-500/20">
+          <Info className="mt-0.5 size-5 shrink-0 text-amber-500" />
+          <div className="text-sm leading-relaxed">
+            <span className="font-semibold text-amber-600 dark:text-amber-400">
+              {t('IMPORTANT NOTE:')}
+            </span>{' '}
+            {t(
+              'This jumble integration is demo white label version of hivetalk.org, for more information please visit API docs, llms.txt at'
+            )}{' '}
+            <a
+              href="https://relay.hivetalk.org/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline hover:text-primary-hover"
+            >
+              relay.hivetalk.org
+            </a>{' '}
+            {t('or')}{' '}
+            <a
+              href="https://hivetalk.org/dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline hover:text-primary-hover"
+            >
+              hivetalk.org/dashboard
+            </a>{' '}
+            {t('for the subscriptions page')}
+          </div>
+        </div>
+
         {!pubkey ? (
           <div className="flex flex-col items-center gap-3 rounded-xl border bg-background p-8 text-center">
             <Video className="size-8 text-muted-foreground" />
@@ -209,6 +241,8 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
                 </Button>
               )}
             </div>
+
+            <RecordingsSection pubkey={pubkey} ownedRooms={ownedRooms} />
 
             {/* Create + Join */}
             <div className="grid gap-4 sm:grid-cols-2">

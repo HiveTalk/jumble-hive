@@ -11,11 +11,75 @@ authentication mechanisms and the use of LiveKit prefab components for the UI.
 
 - **Project Name**: Jumble
 - **Main Tech Stack**: React 18 + TypeScript + Vite, Tailwind CSS + Radix UI, Jotai, Nostr (nostr-tools).
-- **HiveRelay Endpoint**: `https://premrelay.exe.xyz`
+- **HiveRelay Endpoint**: `https://relay.hivetalk.org` (production). Override with `VITE_HIVERELAY_API_BASE` / `VITE_HIVERELAY_RELAY_URL` (e.g. staging: `https://l402relay.exe.xyz` / `wss://l402relay.exe.xyz/`). The relay URL is **not** hardcoded — it is read from env vars with the production relay as the default. See `.env.example` for all available env vars.
 - **Authentication Mechanisms**:
-    - **Mechanism A (Action events)**: Used for `/api/auth/login`, `/api/subscribe`, `/api/payment/status`, `/api/subscription`, `/api/register-room`, `/api/room/edit`. Involves fetching a challenge/nonce, signing a kind-27235 Nostr event with specific tags (`payload`, `action`, `nonce`, `u`, `method`), base64 encoding the event, and sending with `Authorization` and `X-Challenge` headers.
+    - **Mechanism A (Action events)**: Used for `/api/subscribe` (`action=subscribe`), `/api/payment/status` (`action=payment-status`), `/api/subscription` (`action=subscription`), `/api/register-room` (`action=create-room`). Involves fetching a challenge/nonce from `GET /api/auth/challenge`, signing a kind-27235 Nostr event with specific tags (`payload`, `action`, `nonce`, `u`, `method`), base64 encoding the event, and sending with `Authorization: Nostr <base64>` and `X-Challenge` headers. **A nonce is single-use** (and expires in 5 min), so every attempt — including an L402 retry of the *same* logical request — needs its own fresh challenge.
     - **Mechanism B (Body-based signed event)**: Used *only* for `/api/get-token`. The signed kind-27235 event is sent in the request body as a raw JSON string (not base64), with `pubkey` and `attributes.signed_event` fields. No `action` or `nonce` tags, no `X-Challenge` header.
-- **Error Handling**: Specific handling for 402, 403, and 503 HTTP errors. On 402, an inline subscription offer should be shown.
+    - **Mechanism C (LiveKit Bearer token)**: Used *only* for `/api/room/delete`. Mint an owner JWT via `/api/get-token` and send it as `Authorization: Bearer <token>`; the endpoint authenticates the token's owner claim. The body must echo the room name in a `confirm` field as a safety check.
+- **Error Handling**: Specific handling for 402, 403, and 503 HTTP errors. A 403 `room_not_registered` from `/api/get-token` means the name has no registry row (ephemeral room). On 402 the wallet is invoked automatically (see below) — there is no manual invoice/QR UI.
+
+## CRITICAL: L402 Payment Flow
+
+`/api/subscribe` is L402-compliant: the first signed POST returns `402 Payment Required`
+with a macaroon and a BOLT11 invoice. The client pays the invoice via
+`lightningService.payInvoice`, obtains the 32-byte preimage, and retries the request
+with the proof in the `X-L402` header:
+
+```
+X-L402: L402 <macaroon>:<preimage>
+```
+
+The `Authorization` header stays reserved for the Nostr action event, so the retry
+carries **both** headers (plus a fresh `X-Challenge`, per Mechanism A above).
+
+### Read the challenge from the body, not just the header
+
+The relay sends the challenge in `WWW-Authenticate: L402 macaroon="<base64>", invoice="<bolt11>"`,
+but **do not rely on that header alone**. `WWW-Authenticate` is not a CORS-safelisted
+response header, so a browser calling the relay cross-origin cannot read it unless the
+relay lists it in `Access-Control-Expose-Headers`. Parse the header *and* fall back to the
+402 JSON body (`macaroon` + `invoice`, accepting `bolt11` as an alias). Also tolerate a
+non-JSON 402 body — never let `JSON.parse` throw on an error response.
+
+### Polling IS required
+
+The redeem does not always resolve immediately: the relay may answer `200` with
+`status: 'pending'` while it reconciles settlement with the payment provider. Poll
+`/api/payment/status?id=<intent_id>` until the status leaves `pending` rather than
+reporting failure for an invoice that is already paid.
+
+### CRITICAL: never lose a paid invoice — persist the proof
+
+Once `payInvoice` returns, **the user's sats are spent** and the macaroon + preimage are
+the only way to claim what they bought. If the redeeming request then fails (network
+drop, tab close, relay 5xx), an in-memory proof is gone and the next subscribe attempt
+would charge the user a *second* invoice for the same subscription.
+
+So the proof must be persisted **before** the redeem is attempted:
+
+- Store `{macaroon, preimage}` in `localStorage` under a per-account, per-plan key
+  (`hiverelay.l402.proof.<pubkey>:<plan>`) immediately after payment succeeds.
+- At the *start* of `subscribe()`, replay any stored proof before requesting a new
+  challenge, so an interrupted retry can never cost a second invoice.
+- Treat storage failure (private mode, quota) as non-fatal — the in-flight redeem is
+  then simply the only attempt available.
+
+### CRITICAL: drop the proof on every terminal state
+
+A stored proof must be cleared on **any** state the relay will not move away from:
+
+- `settled` — it did its job.
+- `expired` / `failed` — it never will. **This case is easy to get wrong.** If a dead
+  proof is retained, every later subscribe replays it instead of buying a new invoice,
+  and the user is permanently locked out of subscribing. Note that a replay-guard that
+  only clears on a non-`ok` HTTP response is *not* sufficient: the relay can answer
+  `200` with a terminal status body, which never trips that check.
+
+Keep the proof **only** when the outcome is genuinely unknown — a polling timeout or a
+network error — which is the entire reason the storage exists. When the terminal state
+arrives as a thrown error from the poll loop, that path must clear the proof too, so
+distinguish "terminal" from "inconclusive" explicitly rather than by sniffing HTTP status
+codes at the catch site.
 - **LiveKit UI**: Use `@livekit/components-react` prefab components (`PreJoin`, `LiveKitRoom`, `VideoConference`). Customize `PreJoin` to use Nostr profile username and avatar.
 - **Nostr Signing**: Utilize existing client infrastructure (`window.nostr`, nos2x, or nsec login) for kind-27235 event signing.
 

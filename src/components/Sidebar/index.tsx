@@ -24,10 +24,25 @@ import SettingsButton from './SettingsButton'
 import UpdateButton from './UpdateButton'
 import VideoRoomsButton from './VideoRoomsButton'
 
-export default function PrimaryPageSidebar() {
+export default function PrimaryPageSidebar({
+  forceCollapse = false
+}: {
+  /**
+   * Forces the collapsed (icon-only) layout without touching the user's
+   * persisted `sidebarCollapse` preference, and hides the manual
+   * expand/collapse toggle. Used for Video Rooms, where the sidebar always
+   * collapses flush to the edge so tiles get the full remaining width.
+   */
+  forceCollapse?: boolean
+} = {}) {
   const { isSmallScreen } = useScreenSize()
   const { themeSetting } = useTheme()
-  const { sidebarCollapse, updateSidebarCollapse, enableSingleColumnLayout } = useUserPreferences()
+  const {
+    sidebarCollapse: sidebarCollapsePref,
+    updateSidebarCollapse,
+    enableSingleColumnLayout
+  } = useUserPreferences()
+  const sidebarCollapse = forceCollapse || sidebarCollapsePref
   const { pubkey } = useNostr()
   const { navigate } = usePrimaryPage()
 
@@ -76,24 +91,26 @@ export default function PrimaryPageSidebar() {
         <LayoutSwitcher collapse={sidebarCollapse} />
         <AccountButton collapse={sidebarCollapse} />
       </div>
-      <button
-        className={cn(
-          'absolute flex h-6 w-5 flex-col items-center justify-center rounded-s-md p-0 text-muted-foreground transition-colors hover:bg-background hover:text-foreground hover:shadow-md [&_svg]:size-4',
-          themeSetting === 'pure-black' || enableSingleColumnLayout
-            ? 'end-0 top-3'
-            : '-end-0.5 top-5'
-        )}
-        onClick={(e) => {
-          e.stopPropagation()
-          updateSidebarCollapse(!sidebarCollapse)
-        }}
-      >
-        {sidebarCollapse ? (
-          <ChevronsRight className="rtl:-scale-x-100" />
-        ) : (
-          <ChevronsLeft className="rtl:-scale-x-100" />
-        )}
-      </button>
+      {!forceCollapse && (
+        <button
+          className={cn(
+            'absolute flex h-6 w-5 flex-col items-center justify-center rounded-s-md p-0 text-muted-foreground transition-colors hover:bg-background hover:text-foreground hover:shadow-md [&_svg]:size-4',
+            themeSetting === 'pure-black' || enableSingleColumnLayout
+              ? 'end-0 top-3'
+              : '-end-0.5 top-5'
+          )}
+          onClick={(e) => {
+            e.stopPropagation()
+            updateSidebarCollapse(!sidebarCollapse)
+          }}
+        >
+          {sidebarCollapse ? (
+            <ChevronsRight className="rtl:-scale-x-100" />
+          ) : (
+            <ChevronsLeft className="rtl:-scale-x-100" />
+          )}
+        </button>
+      )}
     </div>
   )
 }

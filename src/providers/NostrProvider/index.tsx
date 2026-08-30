@@ -502,6 +502,13 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     const newAccounts = storage.addAccount(act)
     setAccounts(newAccounts)
     storage.switchAccount(act)
+    // Set client.signer synchronously, not in a useEffect. React runs child
+    // effects before parent effects, so a useEffect in NostrProvider would
+    // fire AFTER child components (e.g. VideoRoomsPage) have already started
+    // fetching with the stale signer — getSubscription() would sign as the
+    // previous account and return the wrong subscription card.
+    client.signer = signer
+    client.pubkey = act.pubkey
     setAccount({ pubkey: act.pubkey, signerType: act.signerType })
     setSigner(signer)
     return act.pubkey
@@ -511,6 +518,8 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
     const newAccounts = storage.removeAccount(act)
     setAccounts(newAccounts)
     if (account?.pubkey === act.pubkey) {
+      client.signer = undefined
+      client.pubkey = undefined
       setAccount(null)
       setSigner(null)
     }
@@ -523,6 +532,8 @@ export function NostrProvider({ children }: { children: React.ReactNode }) {
   const switchAccount = async (act: TAccountPointer | null) => {
     if (!act) {
       storage.switchAccount(null)
+      client.signer = undefined
+      client.pubkey = undefined
       setAccount(null)
       setSigner(null)
       return

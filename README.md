@@ -2,8 +2,7 @@
 
 # Jumble-Hive
 
-<img src="https://avatars.githubusercontent.com/u/171218399" width=100>
-A fork of jumble with a basic hivetalk integration
+<img src="https://avatars.githubusercontent.com/u/171218399" width=100> A fork of jumble with a basic hivetalk integration
 
 ## Demo
 

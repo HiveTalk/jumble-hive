@@ -2,9 +2,14 @@
 
 # Jumble-Hive
 
+<img src="https://avatars.githubusercontent.com/u/171218399" width=100>
 A fork of jumble with a basic hivetalk integration
-A subscription to a hivetalk relay required to create a permanent room; 
-Joining open rooms is free
+
+## Demo
+
+https://jumble-hive.vercel.app/
+
+https://github.com/user-attachments/assets/84342904-de44-4c69-a454-0438f1987ab7
 
 ## API documentation
 
@@ -12,15 +17,16 @@ Joining open rooms is free
 - [llms.txt](https://relay.hivetalk.org/llms.txt)
 - [OpenAPI yaml](https://relay.hivetalk.org/openapi.yaml)
 
+
 ## White Label
 
-Subscribe to White label Hivetalk
-https://honey.hivetalk.org/dashboard/subscribe
+- [Subscribe to White label Hivetalk](https://honey.hivetalk.org/dashboard/subscribe)
+- A subscription to a hivetalk relay required to create a permanent room; 
+- Joining open rooms is free
+- Includes Audio recording
 
-## Demo
 
-https://jumble-hive.vercel.app/
-
+# What is Jumble
 
 A user-friendly Nostr client for exploring relay feeds
 

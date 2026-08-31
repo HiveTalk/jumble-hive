@@ -6,6 +6,16 @@ A fork of jumble with a basic hivetalk integration
 A subscription to a hivetalk relay required to create a permanent room; 
 joining open rooms is free
 
+## White Label
+
+Subscribe to White label Hivetalk
+https://honey.hivetalk.org/dashboard/subscribe
+
+## Demo
+
+https://jumble-hive.vercel.app/
+
+
 A user-friendly Nostr client for exploring relay feeds
 
 Experience Jumble at [https://jumble.social](https://jumble.social)

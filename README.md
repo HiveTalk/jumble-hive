@@ -4,7 +4,13 @@
 
 A fork of jumble with a basic hivetalk integration
 A subscription to a hivetalk relay required to create a permanent room; 
-joining open rooms is free
+Joining open rooms is free
+
+## API documentation
+
+- [Redoc](https://relay.hivetalk.org/docs)
+- [llms.txt](https://relay.hivetalk.org/llms.txt)
+- [OpenAPI yaml](https://relay.hivetalk.org/openapi.yaml)
 
 ## White Label
 

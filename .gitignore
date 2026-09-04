@@ -40,3 +40,6 @@ test-results/
 playwright-report/
 
 e2e/.second-nsec.txt
+e2e/screenshots/
+e2e/test-results/
+.env~

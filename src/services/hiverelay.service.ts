@@ -409,6 +409,15 @@ class HiveRelayService {
       }
       const paid = await lightningService.payInvoice(l402.invoice)
       if (!paid?.preimage) {
+        // The user closed the wallet without paying. Cancel the pending intent
+        // so the next plan choice is not blocked by the one-pending-invoice rule.
+        if (body?.intent_id) {
+          try {
+            await this.cancelPayment(body.intent_id)
+          } catch {
+            // Best-effort cancellation; the payment was already cancelled.
+          }
+        }
         throw new HiveRelayError('Payment cancelled', 402)
       }
       // Persist before redeeming: from here on the sats are spent, and the
@@ -487,6 +496,21 @@ class HiveRelayService {
   async getPaymentStatus(intentId: string): Promise<THiveRelayPaymentStatusResponse> {
     return this.actionRequest<THiveRelayPaymentStatusResponse>(
       'GET',
+      '/api/payment/status',
+      'payment-status',
+      { query: { id: intentId } }
+    )
+  }
+
+  /**
+   * DELETE /api/payment/status?id=<intent_id> with action="payment-status".
+   * Cancels a still-pending intent. The relay re-checks settlement first, so a
+   * payment that reached the provider just before dismissal is not discarded.
+   * Returns the final intent state (failed if cancelled, settled if it paid).
+   */
+  async cancelPayment(intentId: string): Promise<THiveRelayPaymentStatusResponse> {
+    return this.actionRequest<THiveRelayPaymentStatusResponse>(
+      'DELETE',
       '/api/payment/status',
       'payment-status',
       { query: { id: intentId } }

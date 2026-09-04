@@ -232,6 +232,20 @@ class HiveRelayService {
     return url.toString()
   }
 
+  /** Same-origin billing proxy so the browser can read the L402 WWW-Authenticate header. */
+  private buildBillingProxyUrl(path: string, query?: Record<string, string>): string {
+    const origin =
+      typeof window !== 'undefined'
+        ? window.location.origin
+        : (import.meta.env.VITE_DEV_ORIGIN as string | undefined) ?? 'http://localhost:5173'
+    const params = new URLSearchParams()
+    params.set('path', path)
+    if (query) {
+      Object.entries(query).forEach(([k, v]) => params.set(k, v))
+    }
+    return `${origin}/api/billing/proxy?${params.toString()}`
+  }
+
   /** JSON.parse that yields undefined instead of throwing on a non-JSON body. */
   private parseJson<T>(text: string): T | undefined {
     if (!text) return undefined
@@ -325,6 +339,29 @@ class HiveRelayService {
     })
   }
 
+  /**
+   * Billing endpoints return an L402 challenge in a `WWW-Authenticate` header,
+   * which is hidden from cross-origin JS.  We sign for the relay URL but POST
+   * through a same-origin proxy so the browser can read the response header.
+   */
+  private async billingActionRequest<T>(
+    method: string,
+    path: string,
+    action: TAction,
+    opts: { query?: Record<string, string>; body?: unknown } = {}
+  ): Promise<T> {
+    const relayUrl = this.buildUrl(path, opts.query)
+    const rawBody = opts.body !== undefined ? JSON.stringify(opts.body) : ''
+    const { nonce, challenge } = await this.getChallenge()
+    const auth = await this.signActionEvent(relayUrl, method, rawBody, action, nonce)
+    const proxyUrl = this.buildBillingProxyUrl(path, opts.query)
+    return this.request<T>(method, proxyUrl, {
+      body: opts.body,
+      auth,
+      challenge
+    })
+  }
+
   // ---- Public API ------------------------------------------------------
 
   /** GET /api/auth/challenge → {challenge, nonce, expires_at, domain} */
@@ -340,23 +377,30 @@ class HiveRelayService {
   /**
    * One signed POST /api/subscribe attempt, optionally carrying an L402 proof.
    * Each attempt needs its own challenge because nonces are single-use.
+   *
+   * The action event is signed for the relay URL (the relay verifies the `u`
+   * tag against its own host), but the request is sent through the same-origin
+   * billing proxy so the browser can read the L402 `WWW-Authenticate` header,
+   * which is not CORS-safelisted.
    */
   private async postSubscribe(
-    url: string,
+    path: string,
     rawBody: string,
     proof?: TL402Proof
   ): Promise<TSubscribeResponse> {
+    const relayUrl = this.buildUrl(path)
     const { nonce, challenge } = await this.getChallenge()
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      Authorization: await this.signActionEvent(url, 'POST', rawBody, 'subscribe', nonce),
+      Authorization: await this.signActionEvent(relayUrl, 'POST', rawBody, 'subscribe', nonce),
       'X-Challenge': challenge
     }
     if (proof) headers['X-L402'] = this.l402AuthHeader(proof.macaroon, proof.preimage)
 
+    const proxyUrl = this.buildBillingProxyUrl(path)
     let res: Response
     try {
-      res = await fetch(url, { method: 'POST', headers, body: rawBody })
+      res = await fetch(proxyUrl, { method: 'POST', headers, body: rawBody })
     } catch (e) {
       const detail = e instanceof Error && e.message ? e.message : 'Network error'
       throw new HiveRelayError(`Could not reach HiveRelay: ${detail}`, 0)
@@ -378,7 +422,7 @@ class HiveRelayService {
    * response is polled to settlement — a paid invoice is never thrown away.
    */
   async subscribe(plan: THiveRelayPlanId): Promise<THiveRelayPaymentStatusResponse> {
-    const url = this.buildUrl('/api/subscribe')
+    const path = '/api/subscribe'
     const rawBody = JSON.stringify({ plan })
     const pubkey = await this.getPublicKey()
 
@@ -387,7 +431,7 @@ class HiveRelayService {
     // new challenge so an interrupted retry cannot cost a second invoice.
     const stored = this.readL402Proof(pubkey, plan)
     if (stored) {
-      const replay = await this.postSubscribe(url, rawBody, stored)
+      const replay = await this.postSubscribe(path, rawBody, stored)
       if (replay.res.ok && replay.body) {
         return this.settleSubscribe(pubkey, plan, replay.body)
       }
@@ -396,7 +440,7 @@ class HiveRelayService {
       this.clearL402Proof(pubkey, plan)
     }
 
-    const { res, text, body } = await this.postSubscribe(url, rawBody)
+    const { res, text, body } = await this.postSubscribe(path, rawBody)
 
     if (res.status === 402) {
       const l402 =
@@ -425,7 +469,7 @@ class HiveRelayService {
       const proof = { macaroon: l402.macaroon, preimage: paid.preimage }
       this.saveL402Proof(pubkey, plan, proof)
 
-      const retry = await this.postSubscribe(url, rawBody, proof)
+      const retry = await this.postSubscribe(path, rawBody, proof)
       if (!retry.res.ok || !retry.body) {
         const gate = this.parseGate(retry.text)
         const detail =
@@ -494,7 +538,7 @@ class HiveRelayService {
    * settled. Rejects on expired/failed.
    */
   async getPaymentStatus(intentId: string): Promise<THiveRelayPaymentStatusResponse> {
-    return this.actionRequest<THiveRelayPaymentStatusResponse>(
+    return this.billingActionRequest<THiveRelayPaymentStatusResponse>(
       'GET',
       '/api/payment/status',
       'payment-status',
@@ -509,7 +553,7 @@ class HiveRelayService {
    * Returns the final intent state (failed if cancelled, settled if it paid).
    */
   async cancelPayment(intentId: string): Promise<THiveRelayPaymentStatusResponse> {
-    return this.actionRequest<THiveRelayPaymentStatusResponse>(
+    return this.billingActionRequest<THiveRelayPaymentStatusResponse>(
       'DELETE',
       '/api/payment/status',
       'payment-status',
@@ -549,7 +593,11 @@ class HiveRelayService {
 
   /** GET /api/subscription — the caller's current entitlement. action="subscription". */
   async getSubscription(): Promise<THiveRelaySubscription> {
-    return this.actionRequest<THiveRelaySubscription>('GET', '/api/subscription', 'subscription')
+    return this.billingActionRequest<THiveRelaySubscription>(
+      'GET',
+      '/api/subscription',
+      'subscription'
+    )
   }
 
   /**

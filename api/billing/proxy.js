@@ -3,7 +3,7 @@ const ALLOWED_PATHS = {
   '/api/payment/status': { methods: ['GET', 'DELETE'], query: ['id'] },
   '/api/subscription': { methods: ['GET'], query: [] }
 }
-const RELAY_BASE = process.env.HIVERELAY_API_BASE || 'https://relay.hivetalk.org'
+const RELAY_BASE = (process.env.HIVERELAY_API_BASE || process.env.VITE_HIVERELAY_API_BASE || 'https://relay.hivetalk.org').replace(/\/$/, '')
 
 export default async function handler(req, res) {
   const url = new URL(req.url, `https://${req.headers.host || 'localhost'}`)

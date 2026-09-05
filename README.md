@@ -5,9 +5,9 @@
 <img src="https://avatars.githubusercontent.com/u/171218399" align="right" width=100> 
 
 A fork of jumble with a basic hivetalk integration. 
-This is a sample codebase, it will NOT BE MAINTAINED. 
+This is a sample codebase, for demo purposes only it will NOT BE MAINTAINED. 
 
-Use the PROMPT as a Guideline, refer to the docs on the relay for finality. 
+If doing an integration see the [PROMPT](https://github.com/HiveTalk/jumble-hive/blob/main/HIVE_FRESH_PROMPT.md) as a Guideline, refer to the docs on the relay for finality. 
 
 
 ## Demo

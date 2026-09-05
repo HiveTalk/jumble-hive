@@ -11,7 +11,7 @@ authentication mechanisms and the use of LiveKit prefab components for the UI.
 
 - **Project Name**: Jumble
 - **Main Tech Stack**: React 18 + TypeScript + Vite, Tailwind CSS + Radix UI, Jotai, Nostr (nostr-tools).
-- **HiveRelay Endpoint**: `https://relay.hivetalk.org` (production). Override with `VITE_HIVERELAY_API_BASE` / `VITE_HIVERELAY_RELAY_URL` (e.g. staging: `https://l402relay.exe.xyz` / `wss://l402relay.exe.xyz/`). The relay URL is **not** hardcoded — it is read from env vars with the production relay as the default. See `.env.example` for all available env vars.
+- **HiveRelay Endpoint**: `https://relay.hivetalk.org` (production). Override with `VITE_HIVERELAY_API_BASE` / `VITE_HIVERELAY_RELAY_URL`. The relay URL is **not** hardcoded — it is read from env vars with the production relay as the default. See `.env.example` for all available env vars.
 - **Authentication Mechanisms**:
     - **Mechanism A (Action events)**: Used for `/api/subscribe` (`action=subscribe`), `/api/payment/status` (`action=payment-status`), `/api/subscription` (`action=subscription`), `/api/register-room` (`action=create-room`). Involves fetching a challenge/nonce from `GET /api/auth/challenge`, signing a kind-27235 Nostr event with specific tags (`payload`, `action`, `nonce`, `u`, `method`), base64 encoding the event, and sending with `Authorization: Nostr <base64>` and `X-Challenge` headers. **A nonce is single-use** (and expires in 5 min), so every attempt — including an L402 retry of the *same* logical request — needs its own fresh challenge.
     - **Mechanism B (Body-based signed event)**: Used *only* for `/api/get-token`. The signed kind-27235 event is sent in the request body as a raw JSON string (not base64), with `pubkey` and `attributes.signed_event` fields. No `action` or `nonce` tags, no `X-Challenge` header.
@@ -32,14 +32,30 @@ X-L402: L402 <macaroon>:<preimage>
 The `Authorization` header stays reserved for the Nostr action event, so the retry
 carries **both** headers (plus a fresh `X-Challenge`, per Mechanism A above).
 
-### Read the challenge from the body, not just the header
+### Read the challenge via a same-origin proxy (CORS-safe)
 
 The relay sends the challenge in `WWW-Authenticate: L402 macaroon="<base64>", invoice="<bolt11>"`,
-but **do not rely on that header alone**. `WWW-Authenticate` is not a CORS-safelisted
-response header, so a browser calling the relay cross-origin cannot read it unless the
-relay lists it in `Access-Control-Expose-Headers`. Parse the header *and* fall back to the
-402 JSON body (`macaroon` + `invoice`, accepting `bolt11` as an alias). Also tolerate a
-non-JSON 402 body — never let `JSON.parse` throw on an error response.
+but `WWW-Authenticate` is **not a CORS-safelisted response header** — a browser calling the
+relay cross-origin cannot read it unless the relay lists it in
+`Access-Control-Expose-Headers`, which the relay does not do. The 402 JSON body also does
+not include the `macaroon` field, so the body alone is insufficient.
+
+The solution is a **same-origin serverless proxy** (`api/billing/proxy.js` on Vercel) that:
+
+1. Receives the signed request from the browser at `/api/billing/proxy?path=<relay_path>`.
+2. Forwards it to the relay with the original `Authorization`, `X-Challenge`, and `X-L402`
+   headers intact.
+3. Copies the upstream `WWW-Authenticate` header into the same-origin response, which the
+   browser **can** read.
+
+The proxy allowlists paths (`/api/subscribe`, `/api/payment/status`, `/api/subscription`),
+methods, and query parameters per endpoint. The action event is signed against the relay's
+URL (the relay verifies the `u` tag against its own host), but the `fetch` goes to the proxy.
+
+`HiveRelayService` uses `billingActionRequest()` and `postSubscribe()` which route through
+the proxy via `buildBillingProxyUrl()`. Non-billing endpoints (`/api/plans`,
+`/api/auth/challenge`, `/api/get-token`, room lifecycle, recordings) call the relay directly
+since they do not return L402 challenges.
 
 ### Polling IS required
 
@@ -47,6 +63,15 @@ The redeem does not always resolve immediately: the relay may answer `200` with
 `status: 'pending'` while it reconciles settlement with the payment provider. Poll
 `/api/payment/status?id=<intent_id>` until the status leaves `pending` rather than
 reporting failure for an invoice that is already paid.
+
+### Cancel unpaid invoices
+
+If the user closes the Lightning wallet without paying, the pending invoice must be
+cancelled so the one-pending-invoice-per-pubkey rule does not block a later purchase.
+Call `DELETE /api/payment/status?id=<intent_id>` (action=`payment-status`) via the
+billing proxy. The relay re-checks settlement first, so a payment that reached the
+provider just before dismissal is not discarded — it returns `settled` instead of
+`failed`. `HiveRelayService.cancelPayment(intentId)` handles this.
 
 ### CRITICAL: never lose a paid invoice — persist the proof
 

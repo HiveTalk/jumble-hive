@@ -9,10 +9,16 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area'
 import hiverelayService from '@/services/hiverelay.service'
 import { THiveRelayPlan } from '@/types/hiverelay'
-import { CheckCircle2, Loader2, RefreshCw, Zap } from 'lucide-react'
+import { Check, CheckCircle2, Loader2, RefreshCw, X, Zap } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
+
+function formatDuration(days: number): string {
+  const years = Math.round(days / 365)
+  if (days >= 365) return `${years} Year${years === 1 ? '' : 's'}`
+  return `${days} days`
+}
 
 type TPhase = 'plans' | 'paying' | 'settled' | 'error'
 
@@ -137,8 +143,17 @@ export default function SubscribeDialog({
                       disabled={loading}
                       className="bg-background hover:bg-accent/40 flex w-full items-center justify-between rounded-xl border p-4 text-start transition-colors disabled:opacity-50"
                     >
-                      <div className="flex flex-col gap-1">
-                        <div className="font-semibold">{plan.id.replace(/_/g, ' ')}</div>
+                      <div className="flex flex-col gap-2">
+                        <div className="font-semibold">
+                          {plan.display_name ?? plan.id.replace(/_/g, ' ')}{' '}
+                          <span
+                            className={`font-medium ${
+                              Math.round(plan.days / 365) === 1 ? 'text-primary' : 'text-foreground'
+                            }`}
+                          >
+                            {formatDuration(plan.days)}
+                          </span>
+                        </div>
                         <div className="text-muted-foreground text-xs">
                           {t('{{days}} days · {{rooms}} rooms · {{sats}} sats', {
                             days: plan.days,
@@ -146,6 +161,25 @@ export default function SubscribeDialog({
                             sats: plan.price_sats
                           })}
                         </div>
+                        {plan.features && plan.features.length > 0 && (
+                          <div className="space-y-1">
+                            {plan.features.map((feature) => (
+                              <div
+                                key={feature.id}
+                                className={`flex items-start gap-1.5 text-xs ${
+                                  feature.included ? 'text-foreground' : 'text-muted-foreground'
+                                }`}
+                              >
+                                {feature.included ? (
+                                  <Check className="text-primary size-3.5 shrink-0" />
+                                ) : (
+                                  <X className="size-3.5 shrink-0" />
+                                )}
+                                <span>{feature.label}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                       <Zap className="text-primary size-4" />
                     </button>

@@ -19,15 +19,27 @@ export interface THiveRelayChallenge {
 
 export type THiveRelayPlanId = string
 
+export interface THiveRelayPlanFeature {
+  id: string
+  label: string
+  included: boolean
+  available?: boolean
+  value?: number
+  unit?: string
+}
+
 export interface THiveRelayPlan {
   id: THiveRelayPlanId
+  display_name?: string
   room_quota: number
   days: number
   price_sats: number
+  features: THiveRelayPlanFeature[]
 }
 
 export interface THiveRelayPlansResponse {
   free_quota: number
+  free_features?: THiveRelayPlanFeature[]
   plans: THiveRelayPlan[]
 }
 

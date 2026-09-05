@@ -31,12 +31,13 @@ export const createSharedConfig = (mode: string, base: string): UserConfig => {
       'import.meta.env.GIT_COMMIT': getGitHash(),
       'import.meta.env.APP_VERSION': getAppVersion(),
       'import.meta.env.VITE_COMMUNITY_RELAY_SETS': JSON.parse(
-        JSON.stringify(env.VITE_COMMUNITY_RELAY_SETS ?? '[]')
+        (env.VITE_COMMUNITY_RELAY_SETS ?? '').trim() || '[]'
       ),
       'import.meta.env.VITE_COMMUNITY_RELAYS': (env.VITE_COMMUNITY_RELAYS ?? '')
         .split(',')
-        .map((url) => normalizeUrl(url))
+        .map((url) => url.trim())
         .filter(Boolean)
+        .map((url) => normalizeUrl(url))
     },
     resolve: {
       alias: {

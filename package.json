@@ -92,7 +92,7 @@
     "i18next": "^24.2.3",
     "i18next-browser-languagedetector": "^8.2.1",
     "jotai": "^2.19.1",
-    "livekit-client": "^2.22.0",
+    "livekit-client": "^2.22.3",
     "lru-cache": "^11.3.5",
     "lucide-react": "^0.469.0",
     "next-themes": "^0.4.6",

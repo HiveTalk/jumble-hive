@@ -70,7 +70,7 @@
     "@tiptap/extension-history": "^3.31.0",
     "@tiptap/extension-mention": "^3.31.0",
     "@tiptap/extension-placeholder": "^3.31.0",
-    "@tiptap/pm": "^2.27.2",
+    "@tiptap/pm": "^3.31.4",
     "@tiptap/react": "^3.31.0",
     "@tiptap/starter-kit": "^3.31.0",
     "@tiptap/suggestion": "^3.31.0",

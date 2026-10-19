@@ -6,4 +6,7 @@ updates:
       interval: weekly
     allow:
       - dependency-type: all
+    ignore:
+      - dependency-name: "@fiatjaf/promenade-trusted-dealer"
+      - dependency-name: "@jsr/fiatjaf__promenade-trusted-dealer"
 

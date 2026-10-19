@@ -125,6 +125,9 @@
       "webpack": "^5.106.2",
       "yaml": "^2.8.3"
     },
+    "ajv": {
+      "fast-uri": "^3.1.8"
+    },
     "serialize-javascript": "^7.0.5",
     "http-cache-semantics": "^4.3.0",
     "stream-json": "^3.6.0",

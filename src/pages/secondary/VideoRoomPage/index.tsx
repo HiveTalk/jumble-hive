@@ -122,7 +122,7 @@ const VideoRoomPage = forwardRef(
   ({ roomName, index }: { roomName?: string; index?: number }, ref) => {
     const { t } = useTranslation()
     const { pop } = useSecondaryPage()
-    const { profile } = useNostr()
+    const { profile, pubkey } = useNostr()
 
     const [phase, setPhase] = useState<TPhase>('prejoin')
     const [error, setError] = useState<string | null>(null)
@@ -202,26 +202,46 @@ const VideoRoomPage = forwardRef(
           {/* Pre-join: device selection + nostr identity */}
           {phase === 'prejoin' && url && token && (
             <div style={{ display: 'grid', placeItems: 'center', height: '100%' }}>
-              <PreJoin
-                defaults={{
-                  username: profile?.username ?? '',
-                  videoEnabled: true,
-                  audioEnabled: true
-                }}
-                onSubmit={handlePreJoinSubmit}
-                joinLabel={t('Join')}
-                userLabel={t('Nostr Profile')}
-              />
-              {npub && (
-                <a
-                  href={`https://nostr.at/${npub}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 text-xs text-white/60 underline hover:text-white/90"
-                >
-                  {npub}
-                </a>
-              )}
+              <div className="flex flex-col items-center gap-3">
+                {/* Identity comes from the logged-in Nostr account — the
+                 * editable username field inside PreJoin (which persists stale
+                 * names in localStorage) is hidden via the wrapper class. */}
+                <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5">
+                  {profile?.avatar ? (
+                    <img
+                      src={profile.avatar}
+                      alt={profile.username ?? ''}
+                      className="size-9 shrink-0 rounded-full object-cover"
+                    />
+                  ) : null}
+                  <span dir="auto" className="font-medium">
+                    {profile?.username ?? pubkey?.slice(0, 8)}
+                  </span>
+                </div>
+                <div className="[&_.lk-username-container_.lk-form-control]:hidden">
+                  <PreJoin
+                    defaults={{
+                      username: profile?.username ?? '',
+                      videoEnabled: true,
+                      audioEnabled: true
+                    }}
+                    onValidate={() => true}
+                    onSubmit={handlePreJoinSubmit}
+                    joinLabel={t('Join')}
+                    userLabel={t('Nostr Profile')}
+                  />
+                </div>
+                {npub && (
+                  <a
+                    href={`https://nostr.at/${npub}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-white/60 underline hover:text-white/90"
+                  >
+                    {npub}
+                  </a>
+                )}
+              </div>
             </div>
           )}
 

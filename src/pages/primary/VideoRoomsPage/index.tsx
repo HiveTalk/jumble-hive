@@ -9,6 +9,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle
 } from '@/components/ui/alert-dialog'
+import { StorageKey } from '@/constants'
 import PrimaryPageLayout from '@/layouts/PrimaryPageLayout'
 import { setPendingVideoRoom } from '@/lib/hiverelay-room-state'
 import { toVideoRoom } from '@/lib/link'
@@ -24,14 +25,85 @@ import {
   THiveRelayRoomSummary,
   THiveRelaySubscription
 } from '@/types/hiverelay'
-import { CheckCircle2, Circle, Info, Loader2, Plus, RefreshCw, Trash2, Users, Video, Zap } from 'lucide-react'
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
+import {
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Info,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Users,
+  Video,
+  Zap
+} from 'lucide-react'
+import { forwardRef, Fragment, useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import CreateRoomDialog from './CreateRoomDialog'
 import JoinRoomCard from './JoinRoomCard'
 import RecordingsSection from './RecordingsSection'
 import SubscribeDialog from './SubscribeDialog'
+
+type TSectionId = 'recordings' | 'create-join' | 'your-rooms' | 'live-now'
+const DEFAULT_SECTION_ORDER: TSectionId[] = ['recordings', 'create-join', 'your-rooms', 'live-now']
+
+function loadSectionOrder(): TSectionId[] {
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(StorageKey.VIDEO_ROOMS_SECTION_ORDER) ?? 'null'
+    ) as string[] | null
+    if (
+      Array.isArray(parsed) &&
+      parsed.length === DEFAULT_SECTION_ORDER.length &&
+      DEFAULT_SECTION_ORDER.every((id) => parsed.includes(id))
+    ) {
+      return parsed as TSectionId[]
+    }
+  } catch {
+    // Corrupted storage value — fall back to the default order.
+  }
+  return [...DEFAULT_SECTION_ORDER]
+}
+
+function SectionControls({
+  canMoveUp,
+  canMoveDown,
+  onMoveUp,
+  onMoveDown
+}: {
+  canMoveUp: boolean
+  canMoveDown: boolean
+  onMoveUp: () => void
+  onMoveDown: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex items-center opacity-0 transition-opacity focus-within:opacity-100 group-hover/section:opacity-100">
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-muted-foreground"
+        disabled={!canMoveUp}
+        onClick={onMoveUp}
+        title={t('Move section up')}
+      >
+        <ChevronUp className="size-4" />
+      </Button>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="h-6 w-6 text-muted-foreground"
+        disabled={!canMoveDown}
+        onClick={onMoveDown}
+        title={t('Move section down')}
+      >
+        <ChevronDown className="size-4" />
+      </Button>
+    </div>
+  )
+}
 
 const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
   const { t } = useTranslation()
@@ -46,7 +118,32 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
   const [subscribeOpen, setSubscribeOpen] = useState(false)
   const [deletingRoom, setDeletingRoom] = useState<THiveRelayOwnedRoom | null>(null)
   const [deleteLoading, setDeleteLoading] = useState(false)
+  const [sectionOrder, setSectionOrder] = useState<TSectionId[]>(loadSectionOrder)
   const refreshSeqRef = useRef(0)
+
+  const moveSection = (id: TSectionId, dir: -1 | 1) => {
+    setSectionOrder((prev) => {
+      const i = prev.indexOf(id)
+      const j = i + dir
+      if (i < 0 || j < 0 || j >= prev.length) return prev
+      const next = [...prev]
+      ;[next[i], next[j]] = [next[j], next[i]]
+      window.localStorage.setItem(StorageKey.VIDEO_ROOMS_SECTION_ORDER, JSON.stringify(next))
+      return next
+    })
+  }
+
+  const sectionControls = (id: TSectionId) => {
+    const i = sectionOrder.indexOf(id)
+    return (
+      <SectionControls
+        canMoveUp={i > 0}
+        canMoveDown={i >= 0 && i < sectionOrder.length - 1}
+        onMoveUp={() => moveSection(id, -1)}
+        onMoveDown={() => moveSection(id, 1)}
+      />
+    )
+  }
 
   const refresh = useCallback(async () => {
     if (!pubkey) return
@@ -247,115 +344,147 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
               )}
             </div>
 
-            <RecordingsSection pubkey={pubkey} ownedRooms={ownedRooms} />
+            {sectionOrder.map((id) => (
+              <Fragment key={id}>
+                {id === 'recordings' && (
+                  <RecordingsSection
+                    pubkey={pubkey}
+                    ownedRooms={ownedRooms}
+                    actions={sectionControls('recordings')}
+                  />
+                )}
 
-            {/* Create + Join */}
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-3 rounded-xl border bg-background p-4">
-                <div className="flex items-center gap-2 font-semibold">
-                  <Plus className="size-4" />
-                  {t('Create a room')}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  {entitled
-                    ? atRoomQuota
-                      ? t('Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.', { used: roomsInUse, quota: roomQuota })
-                      : t('Register a permanent room you own.')
-                    : t('Requires an active subscription.')}
-                </p>
-                <Button
-                  className="w-full"
-                  onClick={() => setCreateOpen(true)}
-                  disabled={!entitled || atRoomQuota}
-                >
-                  <Plus className="size-4" />
-                  {t('Create room')}
-                </Button>
-              </div>
-              <JoinRoomCard />
-            </div>
-
-            {/* Owned rooms */}
-            <section className="flex flex-col gap-2">
-              <h2 className="text-sm font-semibold text-muted-foreground">{t('Your rooms')}</h2>
-              {ownedRooms.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
-                  {t('You have not created any rooms yet.')}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {ownedRooms.map((room) => (
-                    <div
-                      key={room.room_id}
-                      className="flex items-center justify-between rounded-xl border bg-background p-3 transition-colors hover:bg-accent/40"
-                    >
-                      <button
-                        onClick={() => joinOwned(room)}
-                        className="flex min-w-0 flex-1 items-center justify-between text-start"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate font-medium" dir="auto">
-                            {room.room_name}
-                          </div>
-                          <div className="text-xs text-muted-foreground">
-                            {room.is_private ? t('Private') : t('Public')}
-                            {room.audience_mode ? ` · ${t('Audience mode')}` : ''}
-                          </div>
+                {id === 'create-join' && (
+                  <div className="group/section flex flex-col">
+                    <div className="flex justify-end">{sectionControls('create-join')}</div>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="flex flex-col gap-3 rounded-xl border bg-background p-4">
+                        <div className="flex items-center gap-2 font-semibold">
+                          <Plus className="size-4" />
+                          {t('Create a room')}
                         </div>
-                        <div className="flex items-center gap-1 text-primary">
-                          <Video className="size-4" />
-                          {t('Join')}
-                        </div>
-                      </button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="ml-2 shrink-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeletingRoom(room)}
-                        title={t('Delete room')}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
+                        <p className="text-sm text-muted-foreground">
+                          {entitled
+                            ? atRoomQuota
+                              ? t('Room quota reached ({{used}}/{{quota}}). Delete a room to create a new one.', { used: roomsInUse, quota: roomQuota })
+                              : t('Register a permanent room you own.')
+                            : t('Requires an active subscription.')}
+                        </p>
+                        <Button
+                          className="w-full"
+                          onClick={() => setCreateOpen(true)}
+                          disabled={!entitled || atRoomQuota}
+                        >
+                          <Plus className="size-4" />
+                          {t('Create room')}
+                        </Button>
+                      </div>
+                      <JoinRoomCard />
                     </div>
-                  ))}
-                </div>
-              )}
-            </section>
+                  </div>
+                )}
 
-            {/* Live rooms */}
-            <section className="flex flex-col gap-2">
-              <h2 className="text-sm font-semibold text-muted-foreground">{t('Live now')}</h2>
-              {liveRooms.length === 0 ? (
-                <div className="rounded-xl border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
-                  {t('No live rooms right now.')}
-                </div>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  {liveRooms.map((room) => (
-                    <button
-                      key={room.sid}
-                      onClick={() => joinLive(room)}
-                      className="flex items-center justify-between rounded-xl border bg-background p-3 text-start transition-colors hover:bg-accent/40"
-                    >
-                      <div className="min-w-0">
-                        <div className="truncate font-medium" dir="auto">
-                          {room.name}
-                        </div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                          <Circle className="size-2 fill-destructive text-destructive" />
-                          <Users className="size-3" />
-                          {room.numParticipants}
-                        </div>
+                {id === 'your-rooms' && (
+                  <section className="group/section flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-muted-foreground">
+                        {t('Your rooms')}
+                      </h2>
+                      {sectionControls('your-rooms')}
+                    </div>
+                    {ownedRooms.length === 0 ? (
+                      <div className="rounded-xl border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
+                        {t('You have not created any rooms yet.')}
                       </div>
-                      <div className="flex items-center gap-1 text-primary">
-                        <Video className="size-4" />
-                        {t('Join')}
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {ownedRooms.map((room) => (
+                          <div
+                            key={room.room_id}
+                            className="flex items-center justify-between rounded-xl border bg-background p-3 transition-colors hover:bg-accent/40"
+                          >
+                            <button
+                              onClick={() => joinOwned(room)}
+                              className="flex min-w-0 flex-1 items-center justify-between text-start"
+                            >
+                              <div className="min-w-0">
+                                <div className="truncate font-medium" dir="auto">
+                                  {room.room_name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {room.is_private ? t('Private') : t('Public')}
+                                  {room.audience_mode ? ` · ${t('Audience mode')}` : ''}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1 text-primary">
+                                <Video className="size-4" />
+                                {t('Join')}
+                              </div>
+                            </button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="ml-2 shrink-0 text-muted-foreground hover:text-destructive"
+                              onClick={() => setDeletingRoom(room)}
+                              title={t('Delete room')}
+                            >
+                              <Trash2 className="size-4" />
+                            </Button>
+                          </div>
+                        ))}
                       </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </section>
+                    )}
+                  </section>
+                )}
+
+                {id === 'live-now' && (
+                  <section className="group/section flex flex-col gap-2">
+                    <div className="flex items-center justify-between">
+                      <h2 className="text-sm font-semibold text-muted-foreground">
+                        {t('Live now')}
+                      </h2>
+                      {sectionControls('live-now')}
+                    </div>
+                    {liveRooms.length === 0 ? (
+                      <div className="rounded-xl border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
+                        {t('No live rooms right now.')}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col gap-2">
+                        {liveRooms.map((room) => (
+                          <button
+                            key={room.sid}
+                            onClick={() => joinLive(room)}
+                            className="flex items-center justify-between rounded-xl border border-primary/50 bg-background p-3 text-start transition-colors hover:bg-accent/40"
+                          >
+                            <div className="min-w-0">
+                              <div className="truncate font-medium" dir="auto">
+                                {room.name}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <span className="relative flex size-2">
+                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                                  <span className="relative inline-flex size-2 rounded-full bg-primary" />
+                                </span>
+                                <span className="font-medium text-primary">{t('Live')}</span>
+                                <Users className="size-3 text-muted-foreground" />
+                                <span className="text-muted-foreground">
+                                  {room.numParticipants}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1 text-primary">
+                              <Video className="size-4" />
+                              {t('Join')}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </section>
+                )}
+              </Fragment>
+            ))}
           </>
         )}
       </div>

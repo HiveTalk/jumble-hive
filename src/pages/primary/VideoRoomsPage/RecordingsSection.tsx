@@ -19,10 +19,12 @@ type TRecordingEntry = { roomName: string; row: THiveRelayRecordingRow }
  */
 export default function RecordingsSection({
   pubkey,
-  ownedRooms
+  ownedRooms,
+  actions
 }: {
   pubkey?: string
   ownedRooms: THiveRelayOwnedRoom[]
+  actions?: React.ReactNode
 }) {
   const { t } = useTranslation()
   const [entries, setEntries] = useState<TRecordingEntry[]>([])
@@ -102,28 +104,31 @@ export default function RecordingsSection({
   if (!pubkey || (ownedRooms.length === 0 && !loading && entries.length === 0)) return null
 
   return (
-    <section className="flex flex-col gap-2">
-      <button
-        type="button"
-        onClick={() => setExpanded((v) => !v)}
-        aria-expanded={expanded}
-        className="flex items-center justify-between rounded-lg px-1 py-0.5 text-start transition-colors hover:bg-accent/40"
-      >
-        <span className="flex items-center gap-2 text-base font-bold text-foreground">
-          {t('Recordings')}
-          {entries.length > 0 && (
-            <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
-              {entries.length}
-            </span>
-          )}
-        </span>
-        <ChevronDown
-          className={cn(
-            'size-4 shrink-0 text-muted-foreground transition-transform',
-            expanded && 'rotate-180'
-          )}
-        />
-      </button>
+    <section className="group/section flex flex-col gap-2">
+      <div className="flex items-center justify-between rounded-lg px-1 py-0.5 transition-colors hover:bg-accent/40">
+        <button
+          type="button"
+          onClick={() => setExpanded((v) => !v)}
+          aria-expanded={expanded}
+          className="flex min-w-0 items-center gap-2 text-start"
+        >
+          <span className="flex items-center gap-2 text-base font-bold text-foreground">
+            {t('Recordings')}
+            {entries.length > 0 && (
+              <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-xs font-medium text-primary">
+                {entries.length}
+              </span>
+            )}
+          </span>
+          <ChevronDown
+            className={cn(
+              'size-4 shrink-0 text-muted-foreground transition-transform',
+              expanded && 'rotate-180'
+            )}
+          />
+        </button>
+        {actions}
+      </div>
       {expanded &&
         (loading && entries.length === 0 ? (
           <div className="flex items-center justify-center rounded-xl border border-dashed bg-background p-4">

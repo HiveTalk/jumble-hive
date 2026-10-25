@@ -1,5 +1,3 @@
-import { toProfile } from '@/lib/link'
-import { useSecondaryPage } from '@/PageManager'
 import {
   AudioTrack,
   ConnectionQualityIndicator,
@@ -18,8 +16,9 @@ import {
   type TrackReferenceOrPlaceholder
 } from '@livekit/components-react'
 import { Track } from 'livekit-client'
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { useNostrProfiles } from './NostrProfilesContext'
+import ParticipantProfileSheet from './ParticipantProfileSheet'
 
 /**
  * A custom ParticipantTile that shows the participant's Nostr profile avatar
@@ -47,7 +46,7 @@ function NostrParticipantTileImpl({
   const participant = resolvedTrackRef?.participant
   const { metadata, identity } = useParticipantInfo({ participant })
   const { attributes } = useParticipantAttributes({ participant })
-  const { push } = useSecondaryPage()
+  const [profileOpen, setProfileOpen] = useState(false)
 
   // Look up the Nostr profile from context (keyed by pubkey/identity)
   const nostrProfiles = useNostrProfiles()
@@ -69,6 +68,8 @@ function NostrParticipantTileImpl({
     parsedMeta.avatar ||
     ''
   const npub = attributes?.npub || nostrMeta.npub || parsedMeta.npub || ''
+  // Any decodable Nostr id — hex pubkey is preferred but npub works too.
+  const nostrId = attributes?.pubkey || nostrMeta.pubkey || npub || parsedMeta.pubkey || ''
   const displayName =
     nostrMeta.username ||
     attributes?.petname ||
@@ -194,13 +195,13 @@ function NostrParticipantTileImpl({
                     show="muted"
                     style={{ marginRight: '0.25rem' }}
                   />
-                  {npub ? (
+                  {nostrId ? (
                     <button
                       type="button"
-                      title={npub}
+                      title={npub || nostrId}
                       onClick={(e) => {
                         e.stopPropagation()
-                        push(toProfile(npub))
+                        setProfileOpen(true)
                       }}
                       className="cursor-pointer hover:underline"
                       style={{ font: 'inherit', color: 'inherit' }}
@@ -224,6 +225,14 @@ function NostrParticipantTileImpl({
           <FocusToggle trackRef={resolvedTrackRef} />
         </ParticipantContextIfNeeded>
       </TrackRefContextIfNeeded>
+      {nostrId && profileOpen && (
+        <ParticipantProfileSheet
+          open={profileOpen}
+          onOpenChange={setProfileOpen}
+          nostrId={nostrId}
+          fallbackName={displayName}
+        />
+      )}
     </ParticipantTile>
   )
 }

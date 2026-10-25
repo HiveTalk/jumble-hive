@@ -13,7 +13,10 @@ import PrimaryPageLayout from '@/layouts/PrimaryPageLayout'
 import { setPendingVideoRoom } from '@/lib/hiverelay-room-state'
 import { toVideoRoom } from '@/lib/link'
 import { useSecondaryPage } from '@/PageManager'
-import hiverelayService, { HiveRelayError } from '@/services/hiverelay.service'
+import hiverelayService, {
+  buildHiveParticipantAttributes,
+  HiveRelayError
+} from '@/services/hiverelay.service'
 import { useNostr } from '@/providers/NostrProvider'
 import { TPageRef } from '@/types'
 import {
@@ -90,7 +93,8 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
       const { token, url } = await hiverelayService.getToken({
         roomName: room.room_name,
         participantName,
-        pubkey
+        pubkey,
+        attributes: buildHiveParticipantAttributes(profile, participantName, pubkey)
       })
       setPendingVideoRoom({ roomName: room.room_name, participantName, token, url })
       push(toVideoRoom(room.room_name))
@@ -106,7 +110,8 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
       const { token, url } = await hiverelayService.getToken({
         roomName: room.name,
         participantName,
-        pubkey
+        pubkey,
+        attributes: buildHiveParticipantAttributes(profile, participantName, pubkey)
       })
       setPendingVideoRoom({ roomName: room.name, participantName, token, url })
       push(toVideoRoom(room.name))

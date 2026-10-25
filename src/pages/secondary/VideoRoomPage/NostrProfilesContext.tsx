@@ -12,6 +12,9 @@ export interface NostrProfileEntry {
   avatar?: string
   username?: string
   npub?: string
+  pubkey?: string
+  /** Internal marker — a kind-0 lookup already failed; don't retry. */
+  fetchFailed?: boolean
 }
 
 export type NostrProfilesMap = Record<string, NostrProfileEntry>

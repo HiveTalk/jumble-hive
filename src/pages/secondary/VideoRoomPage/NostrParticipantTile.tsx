@@ -1,9 +1,10 @@
+import { toProfile } from '@/lib/link'
+import { useSecondaryPage } from '@/PageManager'
 import {
   AudioTrack,
   ConnectionQualityIndicator,
   FocusToggle,
   ParticipantContextIfNeeded,
-  ParticipantName,
   ParticipantTile,
   TrackMutedIndicator,
   TrackRefContextIfNeeded,
@@ -12,6 +13,7 @@ import {
   useIsMuted,
   useMaybeLayoutContext,
   useMaybeTrackRefContext,
+  useParticipantAttributes,
   useParticipantInfo,
   type TrackReferenceOrPlaceholder
 } from '@livekit/components-react'
@@ -21,11 +23,13 @@ import { useNostrProfiles } from './NostrProfilesContext'
 
 /**
  * A custom ParticipantTile that shows the participant's Nostr profile avatar
- * as a placeholder image when their camera is off (muted or no video track).
+ * as a placeholder image when their camera is off (muted or no video track),
+ * and links the participant name to their Nostr profile.
  *
- * The avatar URL is looked up from the NostrProfilesContext (keyed by LiveKit
- * participant identity, which is the Nostr pubkey) rather than from LiveKit's
- * setMetadata RPC, which can time out on some LiveKit plans.
+ * Profile data is resolved from (in order): the participant's LiveKit
+ * attributes (which HiveRelay bakes into the JWT — `avatar_url`, `npub`,
+ * `petname`, `pubkey`), the NostrProfilesContext (keyed by LiveKit identity,
+ * which is the participantName), and finally the participant metadata JSON.
  */
 function NostrParticipantTileImpl({
   trackRef,
@@ -42,20 +46,37 @@ function NostrParticipantTileImpl({
 
   const participant = resolvedTrackRef?.participant
   const { metadata, identity } = useParticipantInfo({ participant })
+  const { attributes } = useParticipantAttributes({ participant })
+  const { push } = useSecondaryPage()
 
   // Look up the Nostr profile from context (keyed by pubkey/identity)
   const nostrProfiles = useNostrProfiles()
   const nostrMeta = nostrProfiles[identity ?? ''] ?? {}
   // Also try parsing from LiveKit metadata as fallback
-  let parsedMeta = nostrMeta
-  if (!nostrMeta.avatar && metadata) {
+  let parsedMeta: Record<string, string> = {}
+  if (metadata) {
     try {
-      parsedMeta = { ...JSON.parse(metadata), ...nostrMeta }
+      parsedMeta = JSON.parse(metadata)
     } catch {
-      // metadata is not JSON, use context only
+      // metadata is not JSON, ignore
     }
   }
-  const avatarUrl = parsedMeta.avatar ?? participant?.attributes?.avatar
+  const avatarUrl =
+    attributes?.avatar_url ||
+    attributes?.avatar ||
+    nostrMeta.avatar ||
+    parsedMeta.avatar_url ||
+    parsedMeta.avatar ||
+    ''
+  const npub = attributes?.npub || nostrMeta.npub || parsedMeta.npub || ''
+  const displayName =
+    nostrMeta.username ||
+    attributes?.petname ||
+    parsedMeta.petname ||
+    parsedMeta.username ||
+    participant?.name ||
+    identity ||
+    '?'
 
   const layoutContext = useMaybeLayoutContext()
 
@@ -127,7 +148,7 @@ function NostrParticipantTileImpl({
             {avatarUrl ? (
               <img
                 src={avatarUrl}
-                alt={parsedMeta.username ?? 'Participant'}
+                alt={displayName}
                 style={{
                   width: '50%',
                   height: 'auto',
@@ -155,9 +176,7 @@ function NostrParticipantTileImpl({
                   color: 'var(--lk-fg)'
                 }}
               >
-                {(parsedMeta.username ?? participant?.identity ?? '?')
-                  .charAt(0)
-                  .toUpperCase()}
+                {displayName.charAt(0).toUpperCase()}
               </div>
             )}
           </div>
@@ -175,12 +194,27 @@ function NostrParticipantTileImpl({
                     show="muted"
                     style={{ marginRight: '0.25rem' }}
                   />
-                  <ParticipantName />
+                  {npub ? (
+                    <button
+                      type="button"
+                      title={npub}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        push(toProfile(npub))
+                      }}
+                      className="cursor-pointer hover:underline"
+                      style={{ font: 'inherit', color: 'inherit' }}
+                    >
+                      {displayName}
+                    </button>
+                  ) : (
+                    <span>{displayName}</span>
+                  )}
                 </>
               )}
               {resolvedTrackRef?.source === Track.Source.ScreenShare && (
                 <>
-                  <ParticipantName />'s screen
+                  <span>{displayName}</span>'s screen
                 </>
               )}
             </div>

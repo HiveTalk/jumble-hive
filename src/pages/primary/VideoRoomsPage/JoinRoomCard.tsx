@@ -4,7 +4,9 @@ import { setPendingVideoRoom } from '@/lib/hiverelay-room-state'
 import { toVideoRoom } from '@/lib/link'
 import { useSecondaryPage } from '@/PageManager'
 import { useNostr } from '@/providers/NostrProvider'
-import hiverelayService from '@/services/hiverelay.service'
+import hiverelayService, {
+  buildHiveParticipantAttributes
+} from '@/services/hiverelay.service'
 import { Loader2, LogIn } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -27,7 +29,8 @@ export default function JoinRoomCard() {
       const { token, url } = await hiverelayService.getToken({
         roomName: trimmed,
         participantName,
-        pubkey
+        pubkey,
+        attributes: buildHiveParticipantAttributes(profile, participantName, pubkey)
       })
       setPendingVideoRoom({
         roomName: trimmed,

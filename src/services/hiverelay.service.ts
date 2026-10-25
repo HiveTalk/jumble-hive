@@ -24,12 +24,13 @@ import {
   THiveRelayRoomSummary,
   THiveRelaySubscription
 } from '@/types/hiverelay'
-import { ISigner } from '@/types'
+import { ISigner, TProfile } from '@/types'
 import { sha256 } from '@noble/hashes/sha2'
 import { bytesToHex } from '@noble/hashes/utils'
 import dayjs from 'dayjs'
-import { Event } from 'nostr-tools'
+import { Event, nip19 } from 'nostr-tools'
 import lightningService from '@/services/lightning.service'
+import { getLightningAddressFromProfile } from '@/lib/lightning'
 
 type TL402Proof = { macaroon: string; preimage: string }
 
@@ -792,6 +793,29 @@ class HiveRelayService {
       auth: `Bearer ${token}`
     })
   }
+}
+
+/**
+ * LiveKit participant attributes baked into the get-token JWT, using the same
+ * key names the HiveTalk dashboard renders for remote participants
+ * (`avatar_url`, `npub`, `petname`, `lightning_address`). Without these, other
+ * clients in the room see an anonymous user with no Nostr identity. The relay
+ * injects `pubkey` itself from the body's top-level pubkey field.
+ */
+export function buildHiveParticipantAttributes(
+  profile: TProfile | null | undefined,
+  fallbackName?: string,
+  pubkey?: string
+): Record<string, string> {
+  const attributes: Record<string, string> = {}
+  const petname = profile?.username ?? fallbackName
+  if (petname) attributes.petname = petname
+  if (profile?.avatar) attributes.avatar_url = profile.avatar
+  const npub = profile?.npub ?? (pubkey ? nip19.npubEncode(pubkey) : '')
+  if (npub) attributes.npub = npub
+  const lightningAddress = profile ? getLightningAddressFromProfile(profile) : undefined
+  if (lightningAddress) attributes.lightning_address = lightningAddress
+  return attributes
 }
 
 export class HiveRelayError extends Error {

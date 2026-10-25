@@ -40,49 +40,79 @@ function NostrProfilesSync({ children }: { children: React.ReactNode }) {
     const entry = {
       avatar: profile.avatar ?? '',
       username: profile.username ?? '',
-      npub: profile.npub ?? ''
+      npub: profile.npub ?? '',
+      pubkey
     }
     setProfiles((prev) => ({
       ...prev,
       [pubkey]: entry,
+      [pubkey.slice(0, 8)]: entry,
       ...(profile.username ? { [profile.username]: entry } : {})
     }))
   }, [pubkey, profile])
 
-  // Fetch profiles for remote participants when they join
+  // Resolve remote participants' profiles when they join. HiveRelay bakes the
+  // joiner's profile into the LiveKit JWT as participant attributes
+  // (`avatar_url`, `npub`, `petname`, `pubkey`) — read those first since
+  // `identity` is the participantName (a display name, not a pubkey). Only
+  // when the token carries no avatar do we fetch the kind-0 profile from
+  // Nostr relays, keyed by the advertised pubkey/npub.
   useEffect(() => {
-    const remotePubkeys = participants
+    participants
       .filter((p) => !p.isLocal && p.identity)
-      .map((p) => p.identity!)
-      .filter((id) => !profiles[id])
+      .forEach(async (p) => {
+        const identity = p.identity!
+        const attrs = p.attributes ?? {}
+        const npub = attrs.npub ?? ''
+        const remotePubkey = attrs.pubkey ?? ''
+        const avatar = attrs.avatar_url || attrs.avatar || ''
+        const username = attrs.petname || p.name || ''
+        const existing = profiles[identity]
 
-    if (remotePubkeys.length === 0) return
-
-    // Fetch each profile from Nostr relays (kind 0 metadata)
-    remotePubkeys.forEach(async (pubkey) => {
-      // Mark as "fetching" to avoid duplicate fetches
-      setProfiles((prev) => ({
-        ...prev,
-        [pubkey]: prev[pubkey] ?? {}
-      }))
-      try {
-        const fetchedProfile = await client.fetchProfile(pubkey)
-        if (fetchedProfile) {
-          const entry = {
-            avatar: fetchedProfile.avatar ?? '',
-            username: fetchedProfile.username ?? '',
-            npub: fetchedProfile.npub ?? ''
-          }
+        if (!existing || (!existing.avatar && avatar) || (!existing.npub && npub)) {
           setProfiles((prev) => ({
             ...prev,
-            [pubkey]: entry,
-            ...(fetchedProfile.username ? { [fetchedProfile.username]: entry } : {})
+            [identity]: {
+              ...prev[identity],
+              avatar: avatar || prev[identity]?.avatar || '',
+              username: username || prev[identity]?.username || '',
+              npub: npub || prev[identity]?.npub || '',
+              pubkey: remotePubkey || prev[identity]?.pubkey || ''
+            }
           }))
         }
-      } catch {
-        // Profile fetch failed — leave the empty entry so we don't retry
-      }
-    })
+
+        // The token already told us everything we need.
+        if (avatar) return
+        if (existing && (existing.avatar || existing.fetchFailed)) return
+
+        const fetchId =
+          remotePubkey ||
+          npub ||
+          (/^[0-9a-f]{64}$|^npub1|^nprofile1/.test(identity) ? identity : '')
+        if (!fetchId) return
+
+        try {
+          const fetchedProfile = await client.fetchProfile(fetchId)
+          setProfiles((prev) => ({
+            ...prev,
+            [identity]: fetchedProfile
+              ? {
+                  ...prev[identity],
+                  avatar: fetchedProfile.avatar || prev[identity]?.avatar || '',
+                  username: fetchedProfile.username || prev[identity]?.username || '',
+                  npub: fetchedProfile.npub || prev[identity]?.npub || '',
+                  pubkey: fetchedProfile.pubkey || prev[identity]?.pubkey || ''
+                }
+              : { ...prev[identity], fetchFailed: true }
+          }))
+        } catch {
+          setProfiles((prev) => ({
+            ...prev,
+            [identity]: { ...prev[identity], fetchFailed: true }
+          }))
+        }
+      })
   }, [participants, profiles])
 
   return <NostrProfilesProvider profiles={profiles}>{children}</NostrProfilesProvider>

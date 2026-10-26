@@ -8,6 +8,7 @@ import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import CommunityDefinitionPreview from './CommunityDefinitionPreview'
 import EmojiPackPreview from './EmojiPackPreview'
+import FavoriteRelaysPreview from './FavoriteRelaysPreview'
 import FollowPackPreview from './FollowPackPreview'
 import GroupMetadataPreview from './GroupMetadataPreview'
 import HighlightPreview from './HighlightPreview'
@@ -116,6 +117,10 @@ export default function ContentPreview({
 
   if (event.kind === ExtendedKind.FOLLOW_PACK) {
     return <FollowPackPreview event={event} className={className} />
+  }
+
+  if (event.kind === ExtendedKind.FAVORITE_RELAYS) {
+    return <FavoriteRelaysPreview event={event} className={className} />
   }
 
   if (event.kind === kinds.Reaction || event.kind === ExtendedKind.EXTERNAL_CONTENT_REACTION) {

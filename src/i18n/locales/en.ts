@@ -1230,6 +1230,10 @@ export default {
     Zap: 'Zap',
     'Move section up': 'Move section up',
     'Move section down': 'Move section down',
-    Live: 'Live'
+    Live: 'Live',
+    'Copy link': 'Copy link',
+    'Link previews': 'Link previews',
+    'Show previews for links in notes': 'Show previews for links in notes',
+    'Avatar image must be {{size}} MB or smaller': 'Avatar image must be {{size}} MB or smaller'
   }
 }

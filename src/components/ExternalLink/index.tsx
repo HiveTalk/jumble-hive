@@ -11,9 +11,10 @@ import { toExternalContent } from '@/lib/link'
 import { getSafeExternalUrl, truncateUrl } from '@/lib/url'
 import { cn } from '@/lib/utils'
 import { useScreenSize } from '@/providers/ScreenSizeProvider'
-import { ExternalLink as ExternalLinkIcon, MessageSquare } from 'lucide-react'
+import { Copy, ExternalLink as ExternalLinkIcon, MessageSquare } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 export default function ExternalLink({
   url,
@@ -53,6 +54,15 @@ export default function ExternalLink({
     push(toExternalContent(url))
   }
 
+  const handleCopyLink = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    navigator.clipboard.writeText(url)
+    toast.success(t('Copied to Clipboard'))
+    if (isSmallScreen) {
+      setIsDrawerOpen(false)
+    }
+  }
+
   if (!safeUrl) {
     return <span className={cn('wrap-break-word', className)}>{displayUrl}</span>
   }
@@ -63,7 +73,7 @@ export default function ExternalLink({
         href={safeUrl}
         target="_blank"
         rel="noreferrer noopener"
-        className={cn('cursor-pointer text-primary hover:underline', className)}
+        className={cn('text-primary cursor-pointer hover:underline', className)}
         onClick={(e) => e.stopPropagation()}
       >
         {displayUrl}
@@ -78,7 +88,7 @@ export default function ExternalLink({
 
   const trigger = (
     <span
-      className={cn('cursor-pointer text-primary hover:underline', className)}
+      className={cn('text-primary cursor-pointer hover:underline', className)}
       onMouseDown={(e) => {
         // Prevent the autoscroll cursor on middle-click
         if (e.button === 1) e.preventDefault()
@@ -123,6 +133,14 @@ export default function ExternalLink({
                 {t('Open link')}
               </Button>
               <Button
+                onClick={handleCopyLink}
+                className="w-full justify-start gap-4 p-6 text-lg [&_svg]:size-5"
+                variant="ghost"
+              >
+                <Copy />
+                {t('Copy link')}
+              </Button>
+              <Button
                 onClick={handleViewDiscussions}
                 className="w-full justify-start gap-4 p-6 text-lg [&_svg]:size-5"
                 variant="ghost"
@@ -164,7 +182,7 @@ export default function ExternalLink({
           }
         }}
       >
-        <span className={cn('cursor-pointer text-primary hover:underline', className)} title={url}>
+        <span className={cn('text-primary cursor-pointer hover:underline', className)} title={url}>
           {displayUrl}
         </span>
       </DropdownMenuTrigger>
@@ -172,6 +190,10 @@ export default function ExternalLink({
         <DropdownMenuItem onClick={handleOpenLink}>
           <ExternalLinkIcon />
           {t('Open link')}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleCopyLink}>
+          <Copy />
+          {t('Copy link')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleViewDiscussions}>
           <MessageSquare />

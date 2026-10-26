@@ -40,6 +40,10 @@ class DmService {
   private encryptionKeyConfirmedCurrent = false
   // A sync request that arrived before freshness was confirmed; surfaced once it is.
   private pendingSyncRequestEvent: Event | null = null
+  // Client pubkeys identify individual sync rounds. Remembering both sides lets
+  // a key transfer received before its request suppress the later prompt too.
+  private syncRequestsByClientPubkey = new BoundedMap<string, Event>({ maxSize: 100 })
+  private respondedSyncRequestClientPubkeys = new BoundedMap<string, true>({ maxSize: 100 })
   private relaySubscription: { close: () => void } | null = null
   private messageListeners = new Set<(message: TDmMessage) => void>()
   private reactionListeners = new Set<(reaction: TDmMessage) => void>()
@@ -54,6 +58,7 @@ class DmService {
     { recipientGiftWraps: Event[]; selfGiftWraps: Event[]; recipientDmRelays: string[] }
   >({ maxSize: 100 })
   private syncRequestListeners = new Set<(event: Event) => void>()
+  private syncRequestProcessedListeners = new Set<(eventId: string) => void>()
   private encryptionKeyChangedListeners = new Set<
     (result: TEncryptionKeyReconcileResult) => void
   >()
@@ -164,7 +169,10 @@ class DmService {
     this.pendingPublishData.clear()
     this.sendingStatusListeners.clear()
     this.syncRequestListeners.clear()
+    this.syncRequestProcessedListeners.clear()
     this.encryptionKeyChangedListeners.clear()
+    this.syncRequestsByClientPubkey.clear()
+    this.respondedSyncRequestClientPubkeys.clear()
     this.activeConversationKey = null
     this.currentAccountPubkey = null
   }
@@ -399,6 +407,19 @@ class DmService {
     }
   }
 
+  onSyncRequestProcessed(listener: (eventId: string) => void): () => void {
+    this.syncRequestProcessedListeners.add(listener)
+    return () => {
+      this.syncRequestProcessedListeners.delete(listener)
+    }
+  }
+
+  private emitSyncRequestProcessed(eventId: string): void {
+    for (const listener of this.syncRequestProcessedListeners) {
+      listener(eventId)
+    }
+  }
+
   onEncryptionKeyChanged(
     listener: (result: TEncryptionKeyReconcileResult) => void
   ): () => void {
@@ -464,6 +485,16 @@ class DmService {
 
   markSyncRequestProcessed(eventId: string): void {
     storage.addProcessedSyncRequestId(eventId)
+    if (this.pendingSyncRequestEvent?.id === eventId) {
+      this.pendingSyncRequestEvent = null
+    }
+    for (const [clientPubkey, event] of this.syncRequestsByClientPubkey) {
+      if (event.id === eventId) {
+        this.syncRequestsByClientPubkey.delete(clientPubkey)
+        break
+      }
+    }
+    this.emitSyncRequestProcessed(eventId)
   }
 
   async importMessages(accountPubkey: string, rumors: Event[]): Promise<number> {
@@ -1000,6 +1031,15 @@ class DmService {
         authors: [accountPubkey],
         since: fiveMinutesAgo,
         limit: 1
+      },
+      // A key transfer from another device resolves the matching client-key
+      // request. Include recent history as well as live events so relay delivery
+      // order cannot produce a stale confirmation prompt after a response.
+      {
+        kinds: [ExtendedKind.KEY_TRANSFER],
+        authors: [accountPubkey],
+        since: fiveMinutesAgo,
+        limit: 100
       }
     ]
 
@@ -1011,6 +1051,13 @@ class DmService {
           if (event.kind === ExtendedKind.CLIENT_KEY_ANNOUNCEMENT) {
             const clientPubkey = encryptionKeyService.getClientPubkeyFromEvent(event)
             if (!clientPubkey || storage.hasProcessedSyncRequestId(event.id)) return
+            this.syncRequestsByClientPubkey.set(clientPubkey, event)
+            if (this.respondedSyncRequestClientPubkeys.has(clientPubkey)) {
+              // Another device already transferred a key for this exact client
+              // pubkey. Record the request as handled without asking again.
+              this.markSyncRequestProcessed(event.id)
+              return
+            }
             // Only offer to share our key once it's confirmed to be the current
             // one; a stale device must resync itself, not act as the provider. If
             // freshness isn't verified yet, stash the request and surface it once
@@ -1020,6 +1067,20 @@ class DmService {
               return
             }
             this.emitSyncRequest(event)
+            return
+          }
+
+          if (event.kind === ExtendedKind.KEY_TRANSFER) {
+            const clientPubkey = encryptionKeyService.getTransferRecipientClientPubkeyFromEvent(event)
+            if (!clientPubkey) return
+
+            this.respondedSyncRequestClientPubkeys.set(clientPubkey, true)
+            const request = this.syncRequestsByClientPubkey.get(clientPubkey)
+            if (request) {
+              // The dialog may already be open on this device. Marking the
+              // request processed emits a dismissal notification for the UI.
+              this.markSyncRequestProcessed(request.id)
+            }
             return
           }
 

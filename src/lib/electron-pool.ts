@@ -9,7 +9,9 @@ import type {
 } from '@/types/relay-pool'
 import { getElectronBridge } from './platform'
 import { BoundedMap } from './bounded-map'
+import { observeRelayPoolLifecycle } from './relay-pool-lifecycle'
 
+/** Renderer-side relay handle; the actual ManagedRelay lives in the main process. */
 export class ElectronRelay implements IRelay {
   publishTimeout = 10_000
 
@@ -18,10 +20,6 @@ export class ElectronRelay implements IRelay {
     private readonly bridge: TElectronBridge,
     private readonly listeners: Map<string, TSubHandlers>
   ) {}
-
-  get connected(): boolean {
-    return true
-  }
 
   async publish(event: NEvent): Promise<void> {
     return this.bridge.relay.publish(this.url, event, this.publishTimeout)
@@ -107,14 +105,24 @@ export class ElectronPool implements IRelayPool {
         })
       }
     })
+
+    observeRelayPoolLifecycle(this)
   }
 
   async ensureRelay(url: string): Promise<IRelay> {
-    const result = await this.bridge.relay.ensure(url)
-    if (!result.ok) {
-      throw new Error(result.error || `failed to ensure relay ${url}`)
-    }
     return this.getOrCreateRelay(url)
+  }
+
+  getRelay(url: string): IRelay {
+    return this.getOrCreateRelay(url)
+  }
+
+  async checkRelays(): Promise<void> {
+    await this.bridge.relay.checkRelays()
+  }
+
+  setNetworkOnline(online: boolean): Promise<void> {
+    return this.bridge.relay.setNetworkOnline(online)
   }
 
   close(urls: string[]) {

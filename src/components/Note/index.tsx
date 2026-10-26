@@ -127,7 +127,7 @@ export default function Note({
           }}
         />
       )}
-      <NoteContent event={event} originalNoteId={originalNoteId} showFull={showFull} />
+      <NoteContent event={event} originalNoteId={originalNoteId} showFull={showFull} size={size} />
     </div>
   )
 }

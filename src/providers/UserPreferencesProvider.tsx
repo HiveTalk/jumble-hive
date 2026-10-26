@@ -13,6 +13,9 @@ type TUserPreferencesContext = {
   muteMedia: boolean
   updateMuteMedia: (mute: boolean) => void
 
+  showLinkPreviews: boolean
+  updateShowLinkPreviews: (show: boolean) => void
+
   sidebarCollapse: boolean
   updateSidebarCollapse: (collapse: boolean) => void
 
@@ -52,6 +55,7 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
     storage.getNotificationListStyle()
   )
   const [muteMedia, setMuteMedia] = useState(true)
+  const [showLinkPreviews, setShowLinkPreviews] = useState(storage.getShowLinkPreviews())
   const [sidebarCollapse, setSidebarCollapse] = useState(storage.getSidebarCollapse())
   const [enableSingleColumnLayout, setEnableSingleColumnLayout] = useState(
     storage.getEnableSingleColumnLayout()
@@ -83,6 +87,11 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
   const updateSidebarCollapse = (collapse: boolean) => {
     setSidebarCollapse(collapse)
     storage.setSidebarCollapse(collapse)
+  }
+
+  const updateShowLinkPreviews = (show: boolean) => {
+    setShowLinkPreviews(show)
+    storage.setShowLinkPreviews(show)
   }
 
   const updateEnableSingleColumnLayout = (enable: boolean) => {
@@ -123,6 +132,8 @@ export function UserPreferencesProvider({ children }: { children: React.ReactNod
         updateNotificationListStyle,
         muteMedia,
         updateMuteMedia: setMuteMedia,
+        showLinkPreviews,
+        updateShowLinkPreviews,
         sidebarCollapse,
         updateSidebarCollapse,
         enableSingleColumnLayout:

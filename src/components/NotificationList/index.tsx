@@ -12,7 +12,7 @@ import { useUserPreferences } from '@/providers/UserPreferencesProvider'
 import notificationService from '@/services/notification.service'
 import dayjs from 'dayjs'
 import { NostrEvent } from 'nostr-tools'
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import PullToRefresh from '../PullToRefresh'
 import { LoadingBar } from '../LoadingBar'
@@ -143,16 +143,7 @@ export default function NotificationList() {
   const list = (
     <div>
       {groupedNotifications.map((group) => (
-        <Fragment key={group.key}>
-          <NotificationGroupHeader label={group.label} />
-          {group.items.map((notification) => (
-            <NotificationItem
-              key={notification.id}
-              notification={notification}
-              isNew={notification.created_at > lastReadTime}
-            />
-          ))}
-        </Fragment>
+        <NotificationGroup key={group.key} group={group} lastReadTime={lastReadTime} />
       ))}
       <div ref={bottomRef} />
       <div className="text-muted-foreground text-center text-sm">
@@ -230,6 +221,49 @@ function groupNotifications(events: NostrEvent[]) {
     current.items.push(evt)
   }
   return groups
+}
+
+type TNotificationGroup = ReturnType<typeof groupNotifications>[number]
+
+function NotificationGroup({
+  group,
+  lastReadTime
+}: {
+  group: TNotificationGroup
+  lastReadTime: number
+}) {
+  const [visibleNotificationIds, setVisibleNotificationIds] = useState<Set<string>>(() => new Set())
+
+  const handleVisibilityChange = useCallback((notificationId: string, isVisible: boolean) => {
+    setVisibleNotificationIds((previousIds) => {
+      const wasVisible = previousIds.has(notificationId)
+      if (wasVisible === isVisible) return previousIds
+
+      const nextIds = new Set(previousIds)
+      if (isVisible) {
+        nextIds.add(notificationId)
+      } else {
+        nextIds.delete(notificationId)
+      }
+      return nextIds
+    })
+  }, [])
+
+  const hasVisibleNotification = group.items.some(({ id }) => visibleNotificationIds.has(id))
+
+  return (
+    <>
+      {hasVisibleNotification && <NotificationGroupHeader label={group.label} />}
+      {group.items.map((notification) => (
+        <NotificationItem
+          key={notification.id}
+          notification={notification}
+          isNew={notification.created_at > lastReadTime}
+          onVisibilityChange={(isVisible) => handleVisibilityChange(notification.id, isVisible)}
+        />
+      ))}
+    </>
+  )
 }
 
 function NotificationGroupHeader({ label }: { label: string }) {

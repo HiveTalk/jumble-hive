@@ -65,6 +65,7 @@ class LocalStorageService {
   private hideContentMentioningMutedUsers: boolean = false
   private notificationListStyle: TNotificationStyle = NOTIFICATION_LIST_STYLE.DETAILED
   private mediaAutoLoadPolicy: TMediaAutoLoadPolicy = MEDIA_AUTO_LOAD_POLICY.ALWAYS
+  private showLinkPreviews: boolean = true
   private profilePictureAutoLoadPolicy: TProfilePictureAutoLoadPolicy =
     PROFILE_PICTURE_AUTO_LOAD_POLICY.ALWAYS
   private shownCreateWalletGuideToastPubkeys: Set<string> = new Set()
@@ -343,6 +344,8 @@ class LocalStorageService {
     ) {
       this.mediaAutoLoadPolicy = mediaAutoLoadPolicy as TMediaAutoLoadPolicy
     }
+
+    this.showLinkPreviews = window.localStorage.getItem(StorageKey.SHOW_LINK_PREVIEWS) !== 'false'
 
     const profilePictureAutoLoadPolicy = window.localStorage.getItem(
       StorageKey.PROFILE_PICTURE_AUTO_LOAD_POLICY
@@ -1140,6 +1143,15 @@ class LocalStorageService {
 
   getProfilePictureAutoLoadPolicy() {
     return this.profilePictureAutoLoadPolicy
+  }
+
+  getShowLinkPreviews() {
+    return this.showLinkPreviews
+  }
+
+  setShowLinkPreviews(show: boolean) {
+    this.showLinkPreviews = show
+    window.localStorage.setItem(StorageKey.SHOW_LINK_PREVIEWS, show.toString())
   }
 
   setProfilePictureAutoLoadPolicy(policy: TProfilePictureAutoLoadPolicy) {

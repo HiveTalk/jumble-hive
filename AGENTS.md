@@ -231,6 +231,7 @@ I mean kinds that are supported to be displayed in the feed.
 - Kind 9802: Highlight
 - Kind 30023: Long-Form Article
 - Kind 31987: Relay Review
+- Kind 10012: Favorite Relays
 - Kind 34550: Community Definition
 - Kind 30311: Live Event
 - Kind 39000: Group Metadata

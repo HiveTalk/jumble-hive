@@ -1,7 +1,8 @@
 import type { Event as NEvent, EventTemplate, Filter, VerifiedEvent } from 'nostr-tools'
 
 export const IPC_CHANNELS = {
-  ensure: 'relay:ensure',
+  checkRelays: 'relay:check-relays',
+  setNetworkOnline: 'relay:set-network-online',
   publish: 'relay:publish',
   subscribe: 'relay:subscribe',
   closeSub: 'relay:closeSub',
@@ -112,7 +113,8 @@ export type TAuthResponsePayload = {
 }
 
 export type TElectronRelayBridge = {
-  ensure: (url: string) => Promise<{ ok: boolean; error?: string }>
+  checkRelays: () => Promise<void>
+  setNetworkOnline: (online: boolean) => Promise<void>
   publish: (url: string, event: NEvent, timeoutMs: number) => Promise<void>
   subscribe: (subId: string, url: string, filters: Filter[]) => Promise<void>
   closeSub: (subId: string) => Promise<void>
@@ -133,6 +135,7 @@ export type TUpdateStatus =
   | 'available'
   | 'not-available'
   | 'downloading'
+  | 'download-error'
   | 'downloaded'
   | 'error'
 
@@ -142,7 +145,7 @@ export type TUpdateState = {
   currentVersion: string
   /** Version reported by the update server when status is `available`/`downloading`/`downloaded` */
   newVersion?: string
-  /** Download progress 0-100 (only meaningful while `downloading`) */
+  /** Download progress 0-100 (also retained after a failed download) */
   progressPercent?: number
   bytesPerSecond?: number
   releaseNotes?: string

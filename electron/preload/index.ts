@@ -17,7 +17,9 @@ import {
 
 const bridge: TElectronBridge = {
   relay: {
-    ensure: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.ensure, url),
+    checkRelays: () => ipcRenderer.invoke(IPC_CHANNELS.checkRelays),
+    setNetworkOnline: (online: boolean) =>
+      ipcRenderer.invoke(IPC_CHANNELS.setNetworkOnline, online),
     publish: (url: string, event: NEvent, timeoutMs: number) =>
       ipcRenderer.invoke(IPC_CHANNELS.publish, url, event, timeoutMs),
     subscribe: (subId: string, url: string, filters: Filter[]) =>

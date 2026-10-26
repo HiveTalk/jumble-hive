@@ -24,12 +24,13 @@ export default function WebPreview({
   fallbackImage?: string
 }) {
   const { autoLoadMedia } = useContentPolicy()
-  const { allowInsecureConnection } = useUserPreferences()
+  const { allowInsecureConnection, showLinkPreviews } = useUserPreferences()
   const previewRef = useRef<HTMLAnchorElement>(null)
   const [isNearViewport, setIsNearViewport] = useState(false)
   const safeUrl = useMemo(() => getSafeExternalUrl(url), [url])
   const shouldShow =
     Boolean(safeUrl) &&
+    (showLinkPreviews || Boolean(mustLoad)) &&
     (autoLoadMedia || Boolean(mustLoad)) &&
     (allowInsecureConnection || !isInsecureUrl(url))
   const { metadata, isLoading } = useFetchWebMetadata(url, shouldShow && isNearViewport)

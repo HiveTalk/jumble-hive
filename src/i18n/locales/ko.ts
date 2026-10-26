@@ -1144,6 +1144,10 @@ export default {
     'Forgot password?': '비밀번호를 잊으셨나요?',
     'Reset encrypted data': '암호화된 데이터 초기화',
     'Reset encrypted data warning':
-      '비밀번호를 잊었다면 암호화된 데이터를 초기화할 수 있습니다. 이 기기에 저장된 모든 로그인 세션과 개인 키가 영구적으로 삭제되며 되돌릴 수 없습니다.'
+      '비밀번호를 잊었다면 암호화된 데이터를 초기화할 수 있습니다. 이 기기에 저장된 모든 로그인 세션과 개인 키가 영구적으로 삭제되며 되돌릴 수 없습니다.',
+    'Copy link': '링크 복사',
+    'Link previews': '링크 미리보기',
+    'Show previews for links in notes': '노트의 링크 미리보기 표시',
+    'Avatar image must be {{size}} MB or smaller': '아바타 이미지는 {{size}}MB 이하여야 합니다'
   }
 }

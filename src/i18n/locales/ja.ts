@@ -1158,6 +1158,10 @@ export default {
     'Forgot password?': 'パスワードを忘れた場合',
     'Reset encrypted data': '暗号化データをリセット',
     'Reset encrypted data warning':
-      'パスワードを忘れた場合は、暗号化データをリセットできます。このデバイスに保存されているすべてのログインセッションと秘密鍵が完全に削除され、元に戻すことはできません。'
+      'パスワードを忘れた場合は、暗号化データをリセットできます。このデバイスに保存されているすべてのログインセッションと秘密鍵が完全に削除され、元に戻すことはできません。',
+    'Copy link': 'リンクをコピー',
+    'Link previews': 'リンクプレビュー',
+    'Show previews for links in notes': 'ノート内のリンクのプレビューを表示する',
+    'Avatar image must be {{size}} MB or smaller': 'アバター画像は {{size}} MB 以下にしてください'
   }
 }

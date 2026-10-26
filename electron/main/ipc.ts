@@ -35,14 +35,20 @@ export function registerIpcHandlers(
   rendererStorage: RendererStorageStore,
   security: TSecurityContext
 ) {
-  ipcMain.handle(IPC_CHANNELS.ensure, (_e, url: string) => manager.ensure(url))
+  ipcMain.handle(IPC_CHANNELS.checkRelays, () => manager.checkRelays())
+
+  ipcMain.handle(IPC_CHANNELS.setNetworkOnline, (_e, online: boolean) =>
+    manager.setNetworkOnline(online)
+  )
 
   ipcMain.handle(IPC_CHANNELS.publish, (_e, url: string, event: NEvent, timeoutMs: number) =>
     manager.publish(url, event, timeoutMs)
   )
 
-  ipcMain.handle(IPC_CHANNELS.subscribe, (_e, subId: string, url: string, filters: Filter[]) =>
-    manager.subscribe(subId, url, filters)
+  ipcMain.handle(
+    IPC_CHANNELS.subscribe,
+    (_e, subId: string, url: string, filters: Filter[]) =>
+      manager.subscribe(subId, url, filters)
   )
 
   ipcMain.handle(IPC_CHANNELS.closeSub, (_e, subId: string) => manager.closeSub(subId))

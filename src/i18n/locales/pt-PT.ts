@@ -1167,6 +1167,11 @@ export default {
     'Forgot password?': 'Esqueceu-se da palavra-passe?',
     'Reset encrypted data': 'Repor dados encriptados',
     'Reset encrypted data warning':
-      'Se se esqueceu da palavra-passe, pode repor os dados encriptados. Isto elimina permanentemente todas as sessões de início de sessão e chaves privadas guardadas neste dispositivo. Esta ação não pode ser anulada.'
+      'Se se esqueceu da palavra-passe, pode repor os dados encriptados. Isto elimina permanentemente todas as sessões de início de sessão e chaves privadas guardadas neste dispositivo. Esta ação não pode ser anulada.',
+    'Copy link': 'Copiar ligação',
+    'Link previews': 'Pré-visualizações de ligações',
+    'Show previews for links in notes': 'Mostrar pré-visualizações de ligações nas notas',
+    'Avatar image must be {{size}} MB or smaller':
+      'A imagem do avatar deve ter no máximo {{size}} MB'
   }
 }

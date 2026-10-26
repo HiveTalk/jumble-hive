@@ -9,6 +9,7 @@ import AudioPlayer from '../AudioPlayer'
 import Content from '../Content'
 import CommunityDefinition from './CommunityDefinition'
 import EmojiPack from './EmojiPack'
+import FavoriteRelays from './FavoriteRelays'
 import FollowPack from './FollowPack'
 import GroupMetadata from './GroupMetadata'
 import Highlight from './Highlight'
@@ -29,12 +30,14 @@ export default function NoteContent({
   className = '',
   event,
   originalNoteId,
-  showFull = false
+  showFull = false,
+  size = 'normal'
 }: {
   className?: string
   event: Event
   originalNoteId?: string
   showFull?: boolean
+  size?: 'normal' | 'small'
 }) {
   const { nsfwDisplayPolicy } = useContentPolicy()
   const [showNsfw, setShowNsfw] = useState(false)
@@ -125,6 +128,16 @@ export default function NoteContent({
 
   if (event.kind === ExtendedKind.FOLLOW_PACK) {
     return <FollowPack className={cn('mt-2', className)} event={event} />
+  }
+
+  if (event.kind === ExtendedKind.FAVORITE_RELAYS) {
+    return (
+      <FavoriteRelays
+        className={cn('mt-2', className)}
+        event={event}
+        embedded={size === 'small'}
+      />
+    )
   }
 
   if (event.kind === kinds.Reaction) {

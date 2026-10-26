@@ -14,6 +14,7 @@ import { filterOutBigRelays, getDefaultRelayUrls, getSearchRelayUrls } from '@/l
 import { SmartPool } from '@/lib/smart-pool'
 import { getPubkeysFromPTags, getServersFromServerTags, tagNameEquals } from '@/lib/tag'
 import { mergeTimelines } from '@/lib/timeline'
+import { subscribeRelays } from '@/lib/relay-subscription'
 import { isInsecureUrl, isLocalNetworkUrl, isWebsocketUrl, normalizeUrl } from '@/lib/url'
 import { isSafari } from '@/lib/utils'
 import { ISigner, TProfile, TPublishOptions, TRelayList, TSubRequestFilter } from '@/types'
@@ -526,99 +527,30 @@ class ClientService extends EventTarget {
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const that = this
     const _knownIds = new Set<string>()
-    const startedCount = relays.length
-    let eosedCount = 0
-    let eosed = false
-    let closedCount = 0
-    const closeReasons: string[] = []
-    const subPromises: Promise<{ close: () => void }>[] = []
-    relays.forEach((url) => {
-      let hasAuthed = false
-
-      subPromises.push(startSub())
-
-      async function startSub() {
-        const relay = await that.pool.ensureRelay(url).catch(() => {
-          return undefined
-        })
-        // cannot connect to relay
-        if (!relay) {
-          if (!eosed) {
-            eosedCount++
-            eosed = eosedCount >= startedCount
-            oneose?.(eosed)
-          }
-          return {
-            close: () => {}
-          }
+    const networkSub = subscribeRelays(this.pool, relays, filters, {
+      receivedEvent: (relay, id) => {
+        that.trackEventSeenOn(id, relay)
+      },
+      alreadyHaveEvent: (id: string) => {
+        const have = _knownIds.has(id)
+        if (have) return true
+        _knownIds.add(id)
+        return false
+      },
+      onevent,
+      oneose,
+      onclose,
+      onAllClose,
+      startLogin,
+      getAuthenticator: () => {
+        if (!that.signer) return undefined
+        return async (relay) => {
+          await relay.auth(async (authEvt: EventTemplate) => {
+            const evt = await that.signer!.signEvent(authEvt)
+            if (!evt) throw new Error('sign event failed')
+            return evt as VerifiedEvent
+          })
         }
-
-        return relay.subscribe(filters, {
-          receivedEvent: (relay, id) => {
-            that.trackEventSeenOn(id, relay)
-          },
-          alreadyHaveEvent: (id: string) => {
-            const have = _knownIds.has(id)
-            if (have) {
-              return true
-            }
-            _knownIds.add(id)
-            return false
-          },
-          onevent: (evt: NEvent) => {
-            onevent?.(evt)
-          },
-          oneose: () => {
-            // make sure eosed is not called multiple times
-            if (eosed) return
-
-            eosedCount++
-            eosed = eosedCount >= startedCount
-            oneose?.(eosed)
-          },
-          onclose: (reason: string) => {
-            // auth-required
-            if (reason.startsWith('auth-required') && !hasAuthed) {
-              // already logged in
-              if (that.signer) {
-                relay
-                  .auth(async (authEvt: EventTemplate) => {
-                    const evt = await that.signer!.signEvent(authEvt)
-                    if (!evt) {
-                      throw new Error('sign event failed')
-                    }
-                    return evt as VerifiedEvent
-                  })
-                  .then(() => {
-                    hasAuthed = true
-                    if (!eosed) {
-                      subPromises.push(startSub())
-                    }
-                  })
-                  .catch(() => {
-                    // ignore
-                  })
-                return
-              }
-
-              // open login dialog
-              if (startLogin) {
-                startLogin()
-                return
-              }
-            }
-
-            // close the subscription
-            closedCount++
-            closeReasons.push(reason)
-            onclose?.(url, reason)
-            if (closedCount >= startedCount) {
-              onAllClose?.(closeReasons)
-            }
-            return
-          },
-          eoseTimeout: 10_000 // 10s
-        })
       }
     })
 
@@ -644,15 +576,7 @@ class ClientService extends EventTarget {
     return {
       close: () => {
         this.removeEventListener('newEvent', handleNewEventFromInternal)
-        subPromises.forEach((subPromise) => {
-          subPromise
-            .then((sub) => {
-              sub.close()
-            })
-            .catch((err) => {
-              console.error(err)
-            })
-        })
+        networkSub.close()
       }
     }
   }

@@ -24,6 +24,11 @@ class ElectronWebSocket extends WebSocket {
         'User-Agent': USER_AGENT
       }
     })
+
+    // nostr-tools clears onerror immediately after closing a connecting socket,
+    // but ws emits that error asynchronously. Keep a listener so it does not
+    // become an uncaught exception in the Electron main process.
+    this.on('error', () => {})
   }
 }
 
@@ -53,47 +58,48 @@ export class RelayManager {
     this.pool.setTrustedInsecureRelayUrls(urls)
   }
 
-  async ensure(url: string): Promise<{ ok: boolean; error?: string }> {
-    try {
-      await this.pool.ensureRelay(url)
-      return { ok: true }
-    } catch (err) {
-      return { ok: false, error: err instanceof Error ? err.message : String(err) }
-    }
+  async checkRelays() {
+    await this.pool.checkRelays()
+  }
+
+  setNetworkOnline(online: boolean) {
+    this.pool.setNetworkOnline(online)
   }
 
   async publish(url: string, event: NEvent, timeoutMs: number = DEFAULT_PUBLISH_TIMEOUT) {
-    const relay = await this.pool.ensureRelay(url)
+    const relay = this.pool.getRelay(url)
     relay.publishTimeout = timeoutMs
     await relay.publish(event)
   }
 
-  async subscribe(subId: string, url: string, filters: Filter[]) {
+  subscribe(subId: string, url: string, filters: Filter[]) {
     if (this.subs.has(subId)) return
-    const relay = await this.pool.ensureRelay(url)
     const known = new Set<string>()
-    const sub = relay.subscribe(filters, {
-      alreadyHaveEvent: (id: string) => {
-        if (known.has(id)) return true
-        known.add(id)
-        return false
-      },
-      onevent: (evt: NEvent) => {
-        this.sendToRenderer<TSubEventPayload>(IPC_CHANNELS.subEvent, {
-          subId,
-          event: evt,
-          relayUrl: url
-        })
-      },
-      oneose: () => {
-        this.sendToRenderer<TSubEosePayload>(IPC_CHANNELS.subEose, { subId })
-      },
-      onclose: (reason: string) => {
-        this.sendToRenderer<TSubClosePayload>(IPC_CHANNELS.subClose, { subId, reason })
-        this.subs.delete(subId)
-      },
-      eoseTimeout: 10_000
-    })
+    const sub = this.pool.getRelay(url).subscribe(
+      filters,
+      {
+        alreadyHaveEvent: (id: string) => {
+          if (known.has(id)) return true
+          known.add(id)
+          return false
+        },
+        onevent: (evt: NEvent) => {
+          this.sendToRenderer<TSubEventPayload>(IPC_CHANNELS.subEvent, {
+            subId,
+            event: evt,
+            relayUrl: url
+          })
+        },
+        oneose: () => {
+          this.sendToRenderer<TSubEosePayload>(IPC_CHANNELS.subEose, { subId })
+        },
+        onclose: (reason: string) => {
+          this.sendToRenderer<TSubClosePayload>(IPC_CHANNELS.subClose, { subId, reason })
+          this.subs.delete(subId)
+        },
+        eoseTimeout: 10_000
+      }
+    )
     this.subs.set(subId, sub)
   }
 
@@ -109,7 +115,7 @@ export class RelayManager {
   }
 
   async auth(url: string) {
-    const relay = await this.pool.ensureRelay(url)
+    const relay = this.pool.getRelay(url)
     await relay.auth((authEvt: EventTemplate) => this.requestSignatureFromRenderer(url, authEvt))
   }
 

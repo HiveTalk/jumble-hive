@@ -221,6 +221,9 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
   const roomQuota = subscription?.room_quota ?? 0
   const roomsInUse = subscription?.rooms_in_use ?? ownedRooms.length
   const atRoomQuota = roomsInUse >= roomQuota && roomQuota > 0
+  // Rooms with nobody inside aren't live — the relay keeps recently-ended
+  // rooms listed until they're torn down, so filter them out here.
+  const activeLiveRooms = liveRooms.filter((room) => room.numParticipants > 0)
 
   const confirmDelete = async () => {
     if (!deletingRoom) return
@@ -445,37 +448,45 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
                       </h2>
                       {sectionControls('live-now')}
                     </div>
-                    {liveRooms.length === 0 ? (
+                    {activeLiveRooms.length === 0 ? (
                       <div className="rounded-xl border border-dashed bg-background p-4 text-center text-sm text-muted-foreground">
                         {t('No live rooms right now.')}
                       </div>
                     ) : (
-                      <div className="flex flex-col gap-2">
-                        {liveRooms.map((room) => (
+                      <div className="grid gap-2 sm:grid-cols-2">
+                        {activeLiveRooms.map((room) => (
                           <button
                             key={room.sid}
                             onClick={() => joinLive(room)}
-                            className="flex items-center justify-between rounded-xl border border-primary/50 bg-background p-3 text-start transition-colors hover:bg-accent/40"
+                            className="relative overflow-hidden rounded-xl border border-primary/60 bg-background p-3 text-start transition-colors hover:bg-accent/40"
                           >
-                            <div className="min-w-0">
-                              <div className="truncate font-medium" dir="auto">
-                                {room.name}
+                            <span
+                              aria-hidden
+                              className="pointer-events-none absolute inset-0 animate-pulse bg-primary/15"
+                            />
+                            <div className="relative flex items-center justify-between">
+                              <div className="min-w-0">
+                                <div className="truncate font-medium" dir="auto">
+                                  {room.name}
+                                </div>
+                                <div className="flex items-center gap-1.5 text-xs">
+                                  <span className="relative flex size-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
+                                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                                  </span>
+                                  <span className="font-medium text-emerald-500">
+                                    {t('Live')}
+                                  </span>
+                                  <Users className="size-3 text-muted-foreground" />
+                                  <span className="text-muted-foreground">
+                                    {room.numParticipants}
+                                  </span>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-1.5 text-xs">
-                                <span className="relative flex size-2">
-                                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                                  <span className="relative inline-flex size-2 rounded-full bg-primary" />
-                                </span>
-                                <span className="font-medium text-primary">{t('Live')}</span>
-                                <Users className="size-3 text-muted-foreground" />
-                                <span className="text-muted-foreground">
-                                  {room.numParticipants}
-                                </span>
+                              <div className="flex shrink-0 items-center gap-1 text-primary">
+                                <Video className="size-4" />
+                                {t('Join')}
                               </div>
-                            </div>
-                            <div className="flex items-center gap-1 text-primary">
-                              <Video className="size-4" />
-                              {t('Join')}
                             </div>
                           </button>
                         ))}

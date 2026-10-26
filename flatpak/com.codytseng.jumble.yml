@@ -31,6 +31,10 @@ modules:
         npm_config_cache: /run/build/jumble/flatpak-node/npm-cache
         npm_config_nodedir: /usr/lib/sdk/node24
         npm_config_offline: 'true'
+        # flatpak-node-generator pre-fetches the Electron release zips into
+        # this dir; electron-builder's electronDist hook picks them up so the
+        # sandboxed build never needs to reach github.com.
+        FLATPAK_ELECTRON_CACHE: /run/build/jumble/flatpak-node/cache/electron
     sources:
       - generated-sources.json
       - type: dir

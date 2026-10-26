@@ -7,6 +7,15 @@ module.exports = {
   appId: 'com.codytseng.jumble',
   productName: 'Jumble',
   copyright: 'Copyright © ${author}',
+  // Inside flatpak-builder, module builds run sandboxed without network, so
+  // electron-builder can't download the Electron zip from github.com. The
+  // flatpak manifest pre-fetches it into FLATPAK_ELECTRON_CACHE; resolve it
+  // there instead of downloading.
+  electronDist: (options) => {
+    const cache = process.env.FLATPAK_ELECTRON_CACHE
+    if (!cache) return null
+    return `${cache}/electron-v${options.version}-${options.platformName}-${options.arch}.zip`
+  },
   directories: {
     output: 'release/${version}',
     buildResources: 'build'

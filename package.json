@@ -178,6 +178,6 @@
     "vitest": "^5.0.1"
   },
   "optionalDependencies": {
-    "electron": "^44.3.0"
+    "electron": "^44.9.1"
   }
 }

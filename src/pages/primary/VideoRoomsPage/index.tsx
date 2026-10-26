@@ -458,11 +458,11 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
                           <button
                             key={room.sid}
                             onClick={() => joinLive(room)}
-                            className="relative overflow-hidden rounded-xl border border-primary/60 bg-background p-3 text-start transition-colors hover:bg-accent/40"
+                            className="relative overflow-hidden rounded-xl bg-primary p-3 text-start text-primary-foreground shadow-lg shadow-primary/40 transition-colors hover:bg-primary/90"
                           >
                             <span
                               aria-hidden
-                              className="pointer-events-none absolute inset-0 animate-pulse bg-primary/15"
+                              className="pointer-events-none absolute inset-0 animate-pulse bg-white/10"
                             />
                             <div className="relative flex items-center justify-between">
                               <div className="min-w-0">
@@ -471,19 +471,19 @@ const VideoRoomsPage = forwardRef<TPageRef>((_, ref) => {
                                 </div>
                                 <div className="flex items-center gap-1.5 text-xs">
                                   <span className="relative flex size-2">
-                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" />
-                                    <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                                    <span className="relative inline-flex size-2 rounded-full bg-emerald-400" />
                                   </span>
-                                  <span className="font-medium text-emerald-500">
+                                  <span className="font-medium text-emerald-300">
                                     {t('Live')}
                                   </span>
-                                  <Users className="size-3 text-muted-foreground" />
-                                  <span className="text-muted-foreground">
+                                  <Users className="size-3 text-primary-foreground/70" />
+                                  <span className="text-primary-foreground/70">
                                     {room.numParticipants}
                                   </span>
                                 </div>
                               </div>
-                              <div className="flex shrink-0 items-center gap-1 text-primary">
+                              <div className="flex shrink-0 items-center gap-1 font-medium">
                                 <Video className="size-4" />
                                 {t('Join')}
                               </div>

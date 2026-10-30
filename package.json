@@ -128,7 +128,7 @@
     "websocket-polyfill": "^1.0.0",
     "ws": "^8.22.0",
     "yet-another-react-lightbox": "^3.32.2",
-    "zod": "^4.3.6"
+    "zod": "^4.6.7"
   },
   "overrides": {
     "@nostrability/schemata": {
